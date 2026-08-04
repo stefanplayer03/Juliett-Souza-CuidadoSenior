@@ -1,0 +1,190 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile representation in Firestore",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Patient medical and personal profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "cpf": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "phone": { "type": "string" },
+        "emergencyPhone": { "type": "string" },
+        "address": { "type": "string" },
+        "photo": { "type": "string" },
+        "bloodType": { "type": "string" },
+        "weight": { "type": "number" },
+        "height": { "type": "number" },
+        "allergies": { "type": "array" },
+        "diseases": { "type": "array" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["fullName", "cpf", "birthDate", "emergencyPhone"]
+    },
+    "Caregiver": {
+      "title": "Caregiver",
+      "description": "Caregiver or family responsible profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "relationship": { "type": "string", "enum": ["Filho", "Filha", "Esposa", "Marido", "Cuidador", "Curador", "Enfermeiro", "Outro"] },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "isCurrentlyOnDuty": { "type": "boolean" },
+        "receiveNotifications": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "relationship", "phone"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Attending doctor record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "crm": { "type": "string" },
+        "phone": { "type": "string" },
+        "clinic": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "crm"]
+    },
+    "Medication": {
+      "title": "Medication",
+      "description": "Medication prescription schedule details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "photo": { "type": "string" },
+        "dosage": { "type": "string" },
+        "pharmaceuticalForm": { "type": "string", "enum": ["Comprimido", "Gotas", "Pomada", "Injeção", "Cápsula", "Xarope"] },
+        "stockQuantity": { "type": "number" },
+        "scheduledTimes": { "type": "array" },
+        "daysOfWeek": { "type": "array" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "treatmentDurationDays": { "type": "number" },
+        "isContinuous": { "type": "boolean" },
+        "timingInstruction": { "type": "string", "enum": ["Antes da refeição", "Depois da refeição", "Em jejum", "Durante a refeição", "Indiferente"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "dosage", "pharmaceuticalForm", "scheduledTimes"]
+    },
+    "MedicalRecord": {
+      "title": "MedicalRecord",
+      "description": "Detailed medical chart entry for medication",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "medicationId": { "type": "string" },
+        "reason": { "type": "string" },
+        "symptoms": { "type": "string" },
+        "diagnosis": { "type": "string" },
+        "cid": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "crm": { "type": "string" },
+        "consultationDate": { "type": "string" },
+        "prescriptionDate": { "type": "string" },
+        "notes": { "type": "string" },
+        "attachmentUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Individual medication log administration instance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "medicationId": { "type": "string" },
+        "medicationName": { "type": "string" },
+        "dosage": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "administered", "delayed", "missed"] },
+        "administeredAt": { "type": "string" },
+        "administeredBy": { "type": "string" },
+        "responsibleRole": { "type": "string", "enum": ["Paciente", "Cuidador", "Curador", "Familiar", "Enfermeiro"] },
+        "reasonNotAdministered": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "HistoryLog": {
+      "title": "HistoryLog",
+      "description": "Permanent audit trail log of all actions in system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered app users and access roles"
+    },
+    "/patients/{patientId}": {
+      "schema": { "$ref": "#/entities/Patient" },
+      "description": "Patient medical profile"
+    },
+    "/caregivers/{caregiverId}": {
+      "schema": { "$ref": "#/entities/Caregiver" },
+      "description": "Caregiver and responsible contact directory"
+    },
+    "/doctors/{doctorId}": {
+      "schema": { "$ref": "#/entities/Doctor" },
+      "description": "Attending doctors directory"
+    },
+    "/medications/{medicationId}": {
+      "schema": { "$ref": "#/entities/Medication" },
+      "description": "Prescribed medication schedules"
+    },
+    "/medical_records/{recordId}": {
+      "schema": { "$ref": "#/entities/MedicalRecord" },
+      "description": "Medical records and prescriptions"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "Daily medication administration schedule instances"
+    },
+    "/history/{historyId}": {
+      "schema": { "$ref": "#/entities/HistoryLog" },
+      "description": "Permanent immutable system audit trail"
+    }
+  }
+}

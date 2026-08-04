@@ -1,0 +1,6 @@
+{
+  "name": "CuidadoSenior - Controle de Medicamentos",
+  "description": "Aplicativo PWA para gerenciamento inteligente e acessível de medicamentos para idosos, cuidadores e familiares.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
