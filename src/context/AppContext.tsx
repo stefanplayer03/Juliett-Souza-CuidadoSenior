@@ -5,6 +5,7 @@ import {
   Doctor,
   Medication,
   MedicalRecord,
+  MedicalAppointment,
   ScheduleItem,
   HistoryLog,
   AppSettings,
@@ -13,10 +14,31 @@ import {
   ScheduleStatus,
 } from '../types';
 import { audioService } from '../services/audio';
+import { useAuth } from './AuthContext';
+import {
+  firestorePatients,
+  firestoreCaregivers,
+  firestoreDoctors,
+  firestoreMedications,
+  firestoreMedicalRecords,
+  firestoreMedicalAppointments,
+  firestoreSchedules,
+  firestoreHistory,
+} from '../firebase/db';
+
+export type PerspectiveRole = 'paciente' | 'curador' | 'enfermeiro' | 'filhos';
 
 interface AppContextType {
+  patients: Patient[];
+  activePatientId: string;
   patient: Patient;
-  updatePatient: (data: Partial<Patient>, userName: string) => void;
+  selectPatientById: (id: string) => void;
+  addPatient: (data: Omit<Patient, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }, userName: string) => void;
+  updatePatient: (id: string, data: Partial<Patient>, userName: string) => void;
+  deletePatient: (id: string, userName: string) => void;
+
+  perspectiveRole: PerspectiveRole;
+  setPerspectiveRole: (role: PerspectiveRole) => void;
 
   caregivers: Caregiver[];
   addCaregiver: (c: Omit<Caregiver, 'id' | 'createdAt' | 'updatedAt'>, userName: string) => void;
@@ -39,6 +61,11 @@ interface AppContextType {
   addMedicalRecord: (r: Omit<MedicalRecord, 'id' | 'createdAt' | 'updatedAt'>, userName: string) => void;
   updateMedicalRecord: (id: string, r: Partial<MedicalRecord>, userName: string) => void;
 
+  medicalAppointments: MedicalAppointment[];
+  addMedicalAppointment: (a: Omit<MedicalAppointment, 'id' | 'createdAt' | 'updatedAt'>, userName: string) => void;
+  updateMedicalAppointment: (id: string, a: Partial<MedicalAppointment>, userName: string) => void;
+  deleteMedicalAppointment: (id: string, userName: string) => void;
+
   schedules: ScheduleItem[];
   confirmScheduleAdministered: (
     scheduleId: string,
@@ -52,6 +79,7 @@ interface AppContextType {
     administeredBy: string
   ) => void;
   regenerateSchedulesForDate: (dateStr: string) => void;
+  regenerateSchedulesForDates: (dateStrs: string[]) => void;
 
   historyLogs: HistoryLog[];
 
@@ -69,24 +97,62 @@ interface AppContextType {
   isOffline: boolean;
 }
 
-const DEFAULT_PATIENT: Patient = {
-  id: 'patient_1',
-  fullName: 'Dona Francisca Alves de Souza',
-  cpf: '123.456.789-00',
-  birthDate: '1948-05-14',
-  phone: '(11) 98765-4321',
-  emergencyPhone: '(11) 99988-7766',
-  address: 'Rua das Flores, 250, Apto 42 - São Paulo, SP',
-  photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300',
-  bloodType: 'O+',
-  weight: 64.5,
-  height: 1.58,
-  allergies: ['Dipirona', 'Penicilina'],
-  diseases: ['Hipertensão Arterial', 'Diabetes Tipo 2', 'Osteoporose'],
-  notes: 'Necessita de acompanhamento para ingestion de líquidos pela manhã.',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+const DEFAULT_PATIENTS: Patient[] = [
+  {
+    id: 'PAC-8842',
+    fullName: 'Dona Francisca Alves de Souza',
+    cpf: '123.456.789-00',
+    birthDate: '1948-05-14',
+    phone: '(11) 98765-4321',
+    emergencyPhone: '(11) 99988-7766',
+    address: 'Rua das Flores, 250, Apto 42 - São Paulo, SP',
+    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300',
+    bloodType: 'O+',
+    weight: 64.5,
+    height: 1.58,
+    allergies: ['Dipirona', 'Penicilina'],
+    diseases: ['Hipertensão Arterial', 'Diabetes Tipo 2', 'Osteoporose'],
+    notes: 'Necessita de acompanhamento para ingestão de líquidos pela manhã.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'PAC-1093',
+    fullName: 'Sr. Antônio Carlos de Souza',
+    cpf: '321.654.987-11',
+    birthDate: '1942-11-20',
+    phone: '(11) 97777-3333',
+    emergencyPhone: '(11) 99988-7766',
+    address: 'Av. Paulista, 1500 - São Paulo, SP',
+    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300',
+    bloodType: 'A+',
+    weight: 72.0,
+    height: 1.70,
+    allergies: ['Aspirina'],
+    diseases: ['Cardiopatia', 'Hipertensão'],
+    notes: 'Acompanhamento geriátrico regular.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'PAC-4421',
+    fullName: 'Dona Alzira Maria de Oliveira',
+    cpf: '555.444.333-22',
+    birthDate: '1951-03-08',
+    phone: '(11) 96666-5555',
+    emergencyPhone: '(11) 98888-1111',
+    address: 'Rua Augusta, 800 - São Paulo, SP',
+    photo: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=300',
+    bloodType: 'B+',
+    weight: 58.0,
+    height: 1.55,
+    allergies: ['Sulfa'],
+    diseases: ['Artrite Reumatóide'],
+    notes: 'Cuidado especial com articulações.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
 
 const DEFAULT_CAREGIVERS: Caregiver[] = [
   {
@@ -114,7 +180,7 @@ const DEFAULT_CAREGIVERS: Caregiver[] = [
   {
     id: 'cg_3',
     name: 'Enfermeiro Pedro Ramos',
-    relationship: 'Enfermeiro',
+    relationship: 'Enfermeiro(a)',
     phone: '(11) 96666-3333',
     email: 'pedro.enfermeiro@gmail.com',
     isCurrentlyOnDuty: false,
@@ -237,6 +303,47 @@ const DEFAULT_MEDICAL_RECORDS: MedicalRecord[] = [
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
+const getTomorrowISOString = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split('T')[0] + 'T08:30';
+};
+
+const DEFAULT_MEDICAL_APPOINTMENTS: MedicalAppointment[] = [
+  {
+    id: 'app_1',
+    type: 'exame',
+    title: 'Exame de Sangue e Glicemia em Jejum',
+    specialtyOrExam: 'Laboratório de Análises Clínicas',
+    doctorOrClinic: 'Laboratório Fleury - Unidade Jardins',
+    addressOrLocation: 'Av. Brasil, 1200 - São Paulo, SP',
+    dateTime: getTomorrowISOString(),
+    prepInstructions: 'Jejum obrigatório de 12 horas. Beber 1 litro de água 1 hora antes do exame. Não suspender medicação contínua da pressão.',
+    status: 'agendado',
+    attachmentUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    attachmentName: 'Instrucoes_Preparo_Exame.pdf',
+    notes: 'Resultado fica pronto em 2 dias úteis.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'app_2',
+    type: 'consulta',
+    title: 'Consulta Geriatria de Rotina',
+    specialtyOrExam: 'Geriatria & Cardiologia',
+    doctorOrClinic: 'Dra. Ana Costa',
+    addressOrLocation: 'Clínica Vida Senior - Sala 402',
+    dateTime: `${getTodayString()}T14:00`,
+    prepInstructions: 'Levar carteira de vacinação, histórico de aferição de pressão dos últimos 15 dias e caixa dos medicamentos atuais.',
+    status: 'agendado',
+    attachmentUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=400',
+    attachmentName: 'Encaminhamento_Medico.pdf',
+    notes: 'Avaliação de dosagem da Losartana.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
 const generateInitialSchedules = (meds: Medication[]): ScheduleItem[] => {
   const today = getTodayString();
   const schedules: ScheduleItem[] = [];
@@ -314,10 +421,30 @@ const DEFAULT_HISTORY: HistoryLog[] = [
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [patient, setPatient] = useState<Patient>(() => {
-    const s = localStorage.getItem('cs_patient');
-    return s ? JSON.parse(s) : DEFAULT_PATIENT;
+  const { currentUser } = useAuth();
+
+  // Determine effective adminId for data partitioning:
+  // If user is a clinical admin ('admin'), ownership is their own UID.
+  // If user is an operator ('user'), ownership is their linked adminId or 'admin_root'.
+  // If user is superadmin ('superadmin'), they can view and manage all.
+  const currentAdminId =
+    currentUser?.role === 'admin'
+      ? currentUser.uid
+      : currentUser?.adminId || 'admin_root';
+
+  const [patients, setPatients] = useState<Patient[]>(() => {
+    const s = localStorage.getItem('cs_patients_list');
+    return s ? JSON.parse(s) : DEFAULT_PATIENTS;
   });
+
+  const [activePatientId, setActivePatientId] = useState<string>(() => {
+    const s = localStorage.getItem('cs_active_patient_id');
+    return s || (DEFAULT_PATIENTS[0] ? DEFAULT_PATIENTS[0].id : 'PAC-8842');
+  });
+
+  const [perspectiveRole, setPerspectiveRole] = useState<PerspectiveRole>('enfermeiro');
+
+  const activePatient = patients.find((p) => p.id === activePatientId) || patients[0] || DEFAULT_PATIENTS[0];
 
   const [caregivers, setCaregivers] = useState<Caregiver[]>(() => {
     const s = localStorage.getItem('cs_caregivers');
@@ -337,6 +464,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
     const s = localStorage.getItem('cs_medical_records');
     return s ? JSON.parse(s) : DEFAULT_MEDICAL_RECORDS;
+  });
+
+  const [medicalAppointments, setMedicalAppointments] = useState<MedicalAppointment[]>(() => {
+    const s = localStorage.getItem('cs_medical_appointments');
+    return s ? JSON.parse(s) : DEFAULT_MEDICAL_APPOINTMENTS;
   });
 
   const [schedules, setSchedules] = useState<ScheduleItem[]>(() => {
@@ -368,6 +500,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // Firestore background initial sync
+  useEffect(() => {
+    const syncWithFirestore = async () => {
+      try {
+        const [
+          remotePatients,
+          remoteCaregivers,
+          remoteDoctors,
+          remoteMeds,
+          remoteRecords,
+          remoteAppointments,
+          remoteSchedules,
+          remoteHistory,
+        ] = await Promise.all([
+          firestorePatients.getAll(),
+          firestoreCaregivers.getAll(),
+          firestoreDoctors.getAll(),
+          firestoreMedications.getAll(),
+          firestoreMedicalRecords.getAll(),
+          firestoreMedicalAppointments.getAll(),
+          firestoreSchedules.getAll(),
+          firestoreHistory.getAll(),
+        ]);
+
+        if (remotePatients.length > 0) {
+          setPatients(remotePatients);
+          if (!remotePatients.some((p) => p.id === activePatientId)) {
+            setActivePatientId(remotePatients[0].id);
+          }
+        }
+        if (remoteCaregivers.length > 0) setCaregivers(remoteCaregivers);
+        if (remoteDoctors.length > 0) setDoctors(remoteDoctors);
+        if (remoteMeds.length > 0) setMedications(remoteMeds);
+        if (remoteRecords.length > 0) setMedicalRecords(remoteRecords);
+        if (remoteAppointments.length > 0) setMedicalAppointments(remoteAppointments);
+        if (remoteSchedules.length > 0) setSchedules(remoteSchedules);
+        if (remoteHistory.length > 0) setHistoryLogs(remoteHistory);
+      } catch (err) {
+        console.warn('Firestore initial sync notice (using local state):', err);
+      }
+    };
+
+    syncWithFirestore();
+  }, [currentUser]);
+
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -383,15 +560,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync state to local storage
   useEffect(() => {
-    localStorage.setItem('cs_patient', JSON.stringify(patient));
+    localStorage.setItem('cs_patients_list', JSON.stringify(patients));
+    localStorage.setItem('cs_active_patient_id', activePatientId);
+    localStorage.setItem('cs_patient', JSON.stringify(activePatient));
     localStorage.setItem('cs_caregivers', JSON.stringify(caregivers));
     localStorage.setItem('cs_doctors', JSON.stringify(doctors));
     localStorage.setItem('cs_medications', JSON.stringify(medications));
     localStorage.setItem('cs_medical_records', JSON.stringify(medicalRecords));
+    localStorage.setItem('cs_medical_appointments', JSON.stringify(medicalAppointments));
     localStorage.setItem('cs_schedules', JSON.stringify(schedules));
     localStorage.setItem('cs_history', JSON.stringify(historyLogs));
     localStorage.setItem('cs_settings', JSON.stringify(settings));
-  }, [patient, caregivers, doctors, medications, medicalRecords, schedules, historyLogs, settings]);
+  }, [patients, activePatientId, activePatient, caregivers, doctors, medications, medicalRecords, medicalAppointments, schedules, historyLogs, settings]);
 
   const addHistoryLog = (userName: string, actionType: ActionType, description: string) => {
     const now = new Date();
@@ -400,6 +580,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .split(' ')[0]}`;
     const newLog: HistoryLog = {
       id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
       timestamp: formattedDate,
       userName,
       actionType,
@@ -407,14 +589,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: now.toISOString(),
     };
     setHistoryLogs((prev) => [newLog, ...prev]);
+    firestoreHistory.save(newLog).catch(console.warn);
   };
 
-  const updatePatient = (data: Partial<Patient>, userName: string) => {
-    setPatient((prev) => {
-      const updated = { ...prev, ...data, updatedAt: new Date().toISOString() };
-      addHistoryLog(userName, 'alteracao', `Perfil da paciente ${updated.fullName} atualizado.`);
-      return updated;
-    });
+  const selectPatientById = (id: string) => {
+    const found = patients.find((p) => p.id === id);
+    if (found) {
+      setActivePatientId(id);
+      addHistoryLog('Administrador', 'alteracao', `Visualização alternada para o paciente ID: ${id} (${found.fullName}).`);
+    }
+  };
+
+  const addPatient = (data: Omit<Patient, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }, userName: string) => {
+    const customId = data.id || `PAC-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newP: Patient = {
+      ...data,
+      id: customId,
+      adminId: currentAdminId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setPatients((prev) => [...prev, newP]);
+    setActivePatientId(newP.id);
+    addHistoryLog(userName, 'cadastro', `Novo paciente cadastrado com sucesso! ID: ${newP.id} (${newP.fullName}).`);
+    firestorePatients.save(newP).catch(console.warn);
+  };
+
+  const updatePatient = (id: string, data: Partial<Patient>, userName: string) => {
+    setPatients((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const updated = { ...item, ...data, updatedAt: new Date().toISOString() };
+          addHistoryLog(userName, 'alteracao', `Ficha do paciente ID: ${id} (${updated.fullName}) foi atualizada.`);
+          firestorePatients.save(updated).catch(console.warn);
+          return updated;
+        }
+        return item;
+      })
+    );
+  };
+
+  const deletePatient = (id: string, userName: string) => {
+    const target = patients.find((p) => p.id === id);
+    if (target) {
+      setPatients((prev) => prev.filter((p) => p.id !== id));
+      if (activePatientId === id) {
+        const remaining = patients.filter((p) => p.id !== id);
+        if (remaining.length > 0) setActivePatientId(remaining[0].id);
+      }
+      addHistoryLog(userName, 'exclusao', `Paciente ID: ${id} (${target.fullName}) removido do sistema.`);
+      firestorePatients.delete(id).catch(console.warn);
+    }
   };
 
   const addCaregiver = (
@@ -424,6 +649,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newC: Caregiver = {
       ...c,
       id: `cg_${Date.now()}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -433,11 +660,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'cadastro',
       `Novo responsável ${newC.name} (${newC.relationship}) cadastrado.`
     );
+    firestoreCaregivers.save(newC).catch(console.warn);
   };
 
   const updateCaregiver = (id: string, c: Partial<Caregiver>, userName: string) => {
     setCaregivers((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...c, updatedAt: new Date().toISOString() } : item))
+      prev.map((item) => {
+        if (item.id === id) {
+          const updated = { ...item, ...c, updatedAt: new Date().toISOString() };
+          firestoreCaregivers.save(updated).catch(console.warn);
+          return updated;
+        }
+        return item;
+      })
     );
     addHistoryLog(userName, 'alteracao', `Informações do responsável atualizadas.`);
   };
@@ -447,16 +682,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCaregivers((prev) => prev.filter((x) => x.id !== id));
     if (target) {
       addHistoryLog(userName, 'exclusao', `Responsável ${target.name} removido do sistema.`);
+      firestoreCaregivers.delete(id).catch(console.warn);
     }
   };
 
   const setCaregiverOnDuty = (id: string, userName: string) => {
     setCaregivers((prev) =>
-      prev.map((item) => ({
-        ...item,
-        isCurrentlyOnDuty: item.id === id,
-        updatedAt: new Date().toISOString(),
-      }))
+      prev.map((item) => {
+        const updated = {
+          ...item,
+          isCurrentlyOnDuty: item.id === id,
+          updatedAt: new Date().toISOString(),
+        };
+        if (item.id === id) {
+          firestoreCaregivers.save(updated).catch(console.warn);
+        }
+        return updated;
+      })
     );
     const active = caregivers.find((x) => x.id === id);
     if (active) {
@@ -474,16 +716,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newD: Doctor = {
       ...d,
       id: `doc_${Date.now()}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     setDoctors((prev) => [...prev, newD]);
     addHistoryLog(userName, 'cadastro', `Médico ${newD.name} (${newD.specialty}) cadastrado.`);
+    firestoreDoctors.save(newD).catch(console.warn);
   };
 
   const updateDoctor = (id: string, d: Partial<Doctor>, userName: string) => {
     setDoctors((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...d, updatedAt: new Date().toISOString() } : item))
+      prev.map((item) => {
+        if (item.id === id) {
+          const updated = { ...item, ...d, updatedAt: new Date().toISOString() };
+          firestoreDoctors.save(updated).catch(console.warn);
+          return updated;
+        }
+        return item;
+      })
     );
     addHistoryLog(userName, 'alteracao', `Dados médicos atualizados.`);
   };
@@ -493,6 +745,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDoctors((prev) => prev.filter((x) => x.id !== id));
     if (target) {
       addHistoryLog(userName, 'exclusao', `Médico ${target.name} removido.`);
+      firestoreDoctors.delete(id).catch(console.warn);
     }
   };
 
@@ -503,10 +756,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newM: Medication = {
       ...m,
       id: `med_${Date.now()}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setMedications((prev) => [...prev, newM]);
+    const updatedMeds = [...medications, newM];
+    setMedications(updatedMeds);
     addHistoryLog(
       userName,
       'cadastro',
@@ -514,45 +770,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ', '
       )}.`
     );
-    // Automatically generate today's schedule for this new medication
-    regenerateSchedulesForDate(getTodayString());
+    firestoreMedications.save(newM).catch(console.warn);
+    // Automatically generate today's schedule for this new medication using the latest list
+    regenerateSchedulesForDate(getTodayString(), updatedMeds);
   };
 
   const updateMedication = (id: string, m: Partial<Medication>, userName: string) => {
-    setMedications((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const updated = { ...item, ...m, updatedAt: new Date().toISOString() };
-          if (m.scheduledTimes) {
-            addHistoryLog(
-              userName,
-              'troca_horario',
-              `Horários do medicamento ${updated.name} alterados para ${m.scheduledTimes.join(
-                ', '
-              )}.`
-            );
-          }
-          if (m.dosage) {
-            addHistoryLog(
-              userName,
-              'troca_dose',
-              `Dosagem do medicamento ${updated.name} alterada para ${m.dosage}.`
-            );
-          }
-          return updated;
+    let oldDosage = '';
+    const updatedMeds = medications.map((item) => {
+      if (item.id === id) {
+        oldDosage = item.dosage;
+        const updated = { ...item, ...m, updatedAt: new Date().toISOString() };
+        if (m.scheduledTimes && JSON.stringify(m.scheduledTimes) !== JSON.stringify(item.scheduledTimes)) {
+          addHistoryLog(
+            userName,
+            'troca_horario',
+            `Horários do medicamento ${updated.name} alterados de ${item.scheduledTimes.join(', ')} para ${m.scheduledTimes.join(', ')}.`
+          );
         }
-        return item;
-      })
-    );
-    regenerateSchedulesForDate(getTodayString());
+        if (m.dosage && m.dosage !== item.dosage) {
+          addHistoryLog(
+            userName,
+            'troca_dose',
+            `Dosagem do medicamento ${updated.name} alterada de "${oldDosage}" para "${m.dosage}".`
+          );
+        }
+        firestoreMedications.save(updated).catch(console.warn);
+        return updated;
+      }
+      return item;
+    });
+
+    setMedications(updatedMeds);
+
+    // Update dosage and details across existing schedules in state for this medication
+    const targetMed = updatedMeds.find((x) => x.id === id);
+    if (targetMed) {
+      setSchedules((prevSchedules) =>
+        prevSchedules.map((s) => {
+          if (s.medicationId === id) {
+            const updatedSchedule = {
+              ...s,
+              medicationName: targetMed.name,
+              dosage: targetMed.dosage,
+              pharmaceuticalForm: targetMed.pharmaceuticalForm,
+              photo: targetMed.photo,
+              timingInstruction: targetMed.timingInstruction,
+              updatedAt: new Date().toISOString(),
+            };
+            firestoreSchedules.save(updatedSchedule).catch(console.warn);
+            return updatedSchedule;
+          }
+          return s;
+        })
+      );
+    }
+
+    regenerateSchedulesForDate(getTodayString(), updatedMeds);
   };
 
   const deleteMedication = (id: string, userName: string) => {
     const target = medications.find((x) => x.id === id);
-    setMedications((prev) => prev.filter((x) => x.id !== id));
-    setSchedules((prev) => prev.filter((x) => x.medicationId !== id));
+    const updatedMeds = medications.filter((x) => x.id !== id);
+    setMedications(updatedMeds);
+    // Keep administered schedules for history and audit, remove pending/missed for deleted medication
+    setSchedules((prev) => prev.filter((x) => x.medicationId !== id || x.status === 'administered'));
     if (target) {
       addHistoryLog(userName, 'exclusao', `Medicamento ${target.name} excluído do sistema.`);
+      firestoreMedications.delete(id).catch(console.warn);
     }
   };
 
@@ -563,6 +848,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newR: MedicalRecord = {
       ...r,
       id: `mr_${Date.now()}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -572,13 +859,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'cadastro',
       `Ficha médica/prescrição registrada para o médico ${newR.doctorName}.`
     );
+    firestoreMedicalRecords.save(newR).catch(console.warn);
   };
 
   const updateMedicalRecord = (id: string, r: Partial<MedicalRecord>, userName: string) => {
     setMedicalRecords((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...r, updatedAt: new Date().toISOString() } : item))
+      prev.map((item) => {
+        if (item.id === id) {
+          const updated = { ...item, ...r, updatedAt: new Date().toISOString() };
+          firestoreMedicalRecords.save(updated).catch(console.warn);
+          return updated;
+        }
+        return item;
+      })
     );
     addHistoryLog(userName, 'alteracao', `Ficha médica atualizada.`);
+  };
+
+  const addMedicalAppointment = (
+    a: Omit<MedicalAppointment, 'id' | 'createdAt' | 'updatedAt'>,
+    userName: string
+  ) => {
+    const newA: MedicalAppointment = {
+      ...a,
+      id: `app_${Date.now()}`,
+      adminId: currentAdminId,
+      patientId: activePatientId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setMedicalAppointments((prev) => [newA, ...prev]);
+    const label = newA.type === 'exame' ? 'Exame' : 'Consulta Médica';
+    addHistoryLog(
+      userName,
+      'cadastro',
+      `${label} "${newA.title}" agendado(a) para ${newA.dateTime.replace('T', ' às ')}.`
+    );
+    firestoreMedicalAppointments.save(newA).catch(console.warn);
+  };
+
+  const updateMedicalAppointment = (id: string, a: Partial<MedicalAppointment>, userName: string) => {
+    setMedicalAppointments((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const updated = { ...item, ...a, updatedAt: new Date().toISOString() };
+          firestoreMedicalAppointments.save(updated).catch(console.warn);
+          return updated;
+        }
+        return item;
+      })
+    );
+    addHistoryLog(userName, 'alteracao', `Agendamento de consulta/exame atualizado.`);
+  };
+
+  const deleteMedicalAppointment = (id: string, userName: string) => {
+    const target = medicalAppointments.find((x) => x.id === id);
+    setMedicalAppointments((prev) => prev.filter((x) => x.id !== id));
+    if (target) {
+      addHistoryLog(userName, 'exclusao', `Agendamento "${target.title}" removido.`);
+      firestoreMedicalAppointments.delete(id).catch(console.warn);
+    }
   };
 
   const confirmScheduleAdministered = (
@@ -595,6 +935,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (item.id === scheduleId) {
           const updated: ScheduleItem = {
             ...item,
+            adminId: item.adminId || currentAdminId,
+            patientId: item.patientId || activePatientId,
             status: 'administered',
             administeredAt: `${item.scheduledDate} ${formattedTime}`,
             administeredBy,
@@ -610,11 +952,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           // Decrease stock quantity by 1
           setMedications((meds) =>
-            meds.map((m) =>
-              m.id === item.medicationId
-                ? { ...m, stockQuantity: Math.max(0, m.stockQuantity - 1) }
-                : m
-            )
+            meds.map((m) => {
+              if (m.id === item.medicationId) {
+                const updatedMed = { ...m, stockQuantity: Math.max(0, m.stockQuantity - 1) };
+                firestoreMedications.save(updatedMed).catch(console.warn);
+                return updatedMed;
+              }
+              return m;
+            })
           );
 
           addHistoryLog(
@@ -623,6 +968,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             `Medicamento ${item.medicationName} (${item.dosage}) administrado pelo ${responsibleRole.toLowerCase()} ${administeredBy} às ${formattedTime}.`
           );
 
+          firestoreSchedules.save(updated).catch(console.warn);
           return updated;
         }
         return item;
@@ -641,6 +987,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (item.id === scheduleId) {
           const updated: ScheduleItem = {
             ...item,
+            adminId: item.adminId || currentAdminId,
+            patientId: item.patientId || activePatientId,
             status: 'missed',
             reasonNotAdministered: reason,
             administeredBy,
@@ -653,6 +1001,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             `Medicamento ${item.medicationName} das ${item.scheduledTime} não foi administrado. Motivo: ${reason}.`
           );
 
+          firestoreSchedules.save(updated).catch(console.warn);
           return updated;
         }
         return item;
@@ -660,39 +1009,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const regenerateSchedulesForDate = (dateStr: string) => {
+  const regenerateSchedulesForDates = (dateStrs: string[], currentMeds?: Medication[]) => {
+    const medsToUse = currentMeds || medications;
     setSchedules((existingSchedules) => {
-      const otherDates = existingSchedules.filter((s) => s.scheduledDate !== dateStr);
+      const datesSet = new Set(dateStrs);
+      const otherDates = existingSchedules.filter((s) => !datesSet.has(s.scheduledDate));
       const newItems: ScheduleItem[] = [];
 
-      medications.forEach((m) => {
-        m.scheduledTimes.forEach((time, idx) => {
-          const existing = existingSchedules.find(
-            (s) => s.scheduledDate === dateStr && s.medicationId === m.id && s.scheduledTime === time
-          );
-          if (existing) {
-            newItems.push(existing);
-          } else {
-            newItems.push({
-              id: `sch_${m.id}_${dateStr}_${idx}`,
-              medicationId: m.id,
-              medicationName: m.name,
-              dosage: m.dosage,
-              pharmaceuticalForm: m.pharmaceuticalForm,
-              photo: m.photo,
-              timingInstruction: m.timingInstruction,
-              scheduledDate: dateStr,
-              scheduledTime: time,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
+      dateStrs.forEach((dateStr) => {
+        medsToUse.forEach((m) => {
+          // Check start date constraint
+          const mStart = m.startDate || '2000-01-01';
+          if (dateStr < mStart) {
+            return; // Medication not started yet on dateStr
           }
+          // Check end date constraint
+          if (!m.isContinuous && m.endDate && dateStr > m.endDate) {
+            return; // Medication treatment finished before dateStr
+          }
+
+          m.scheduledTimes.forEach((time, idx) => {
+            const existing = existingSchedules.find(
+              (s) => s.scheduledDate === dateStr && s.medicationId === m.id && s.scheduledTime === time
+            );
+            if (existing) {
+              newItems.push({
+                ...existing,
+                medicationName: m.name,
+                dosage: m.dosage,
+                pharmaceuticalForm: m.pharmaceuticalForm,
+                photo: m.photo,
+                timingInstruction: m.timingInstruction,
+              });
+            } else {
+              newItems.push({
+                id: `sch_${m.id}_${dateStr}_${idx}`,
+                medicationId: m.id,
+                medicationName: m.name,
+                dosage: m.dosage,
+                pharmaceuticalForm: m.pharmaceuticalForm,
+                photo: m.photo,
+                timingInstruction: m.timingInstruction,
+                scheduledDate: dateStr,
+                scheduledTime: time,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          });
         });
       });
 
       return [...otherDates, ...newItems];
     });
+  };
+
+  const regenerateSchedulesForDate = (dateStr: string, currentMeds?: Medication[]) => {
+    regenerateSchedulesForDates([dateStr], currentMeds);
   };
 
   const updateSettings = (s: Partial<AppSettings>) => {
@@ -702,8 +1076,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
-        patient,
+        patients,
+        activePatientId,
+        patient: activePatient,
+        selectPatientById,
+        addPatient,
         updatePatient,
+        deletePatient,
+        perspectiveRole,
+        setPerspectiveRole,
         caregivers,
         addCaregiver,
         updateCaregiver,
@@ -721,10 +1102,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         medicalRecords,
         addMedicalRecord,
         updateMedicalRecord,
+        medicalAppointments,
+        addMedicalAppointment,
+        updateMedicalAppointment,
+        deleteMedicalAppointment,
         schedules,
         confirmScheduleAdministered,
         markScheduleNotAdministered,
         regenerateSchedulesForDate,
+        regenerateSchedulesForDates,
         historyLogs,
         currentView,
         setCurrentView,

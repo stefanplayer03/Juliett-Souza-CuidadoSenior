@@ -10,13 +10,16 @@ import { MedicalRecordView } from './components/MedicalRecordView';
 import { CaregiverManagement } from './components/CaregiverManagement';
 import { DoctorManagement } from './components/DoctorManagement';
 import { AuditHistory } from './components/AuditHistory';
+import { UserManagement } from './components/UserManagement';
+import { SaaSLogin } from './components/SaaSLogin';
 import { AuthModal } from './components/AuthModal';
 import { SettingsModal } from './components/SettingsModal';
+import { MedicationAlarmBanner } from './components/MedicationAlarmBanner';
 import { Download, AlertCircle } from 'lucide-react';
 
 export function App() {
   const { currentView, settings, isOffline } = useApp();
-  const { role } = useAuth();
+  const { currentUser, role, isSuperAdmin, isAdmin } = useAuth();
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -53,6 +56,11 @@ export function App() {
       ? 'text-base'
       : 'text-sm';
 
+  // If user is not logged in OR has mandatory first-access setup pending, display SaaS Login screen
+  if (!currentUser || currentUser.mustChangePassword) {
+    return <SaaSLogin onSuccess={() => {}} />;
+  }
+
   return (
     <div className={`min-h-screen bg-[#E9F7F2] text-[#1F2E2C] font-sans transition-all ${fontClass}`}>
       {/* Offline Alert Banner */}
@@ -66,7 +74,12 @@ export function App() {
       <Navbar
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        deferredPrompt={deferredPrompt}
+        onInstallPWA={handleInstallPWA}
       />
+
+      {/* Global Real-time Visual & Acoustic Medication Alarm Banner */}
+      <MedicationAlarmBanner />
 
       {/* Main Container View Switcher */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -78,6 +91,7 @@ export function App() {
         {currentView === 'caregivers' && <CaregiverManagement />}
         {currentView === 'doctors' && <DoctorManagement />}
         {currentView === 'history' && <AuditHistory />}
+        {currentView === 'users' && <UserManagement />}
       </main>
 
       {/* Modals */}

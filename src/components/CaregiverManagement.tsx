@@ -28,12 +28,19 @@ export const CaregiverManagement: React.FC = () => {
   const isAdmin = role === 'admin';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingCaregiver, setDeletingCaregiver] = useState<Caregiver | null>(null);
+  const [showInlineForm, setShowInlineForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<CaregiverRelation>('Cuidador');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [shiftHours, setShiftHours] = useState('');
+  const [notes, setNotes] = useState('');
   const [receiveNotifications, setReceiveNotifications] = useState(true);
 
   const userName = currentUser?.displayName || 'Administrador';
@@ -43,6 +50,9 @@ export const CaregiverManagement: React.FC = () => {
     setRelationship('Cuidador');
     setPhone('');
     setEmail('');
+    setCpf('');
+    setShiftHours('');
+    setNotes('');
     setReceiveNotifications(true);
     setEditingId(null);
   };
@@ -58,20 +68,31 @@ export const CaregiverManagement: React.FC = () => {
     setRelationship(c.relationship);
     setPhone(c.phone);
     setEmail(c.email);
+    setCpf(c.cpf || '');
+    setShiftHours(c.shiftHours || '');
+    setNotes(c.notes || '');
     setReceiveNotifications(c.receiveNotifications);
     setIsModalOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone) return;
+    if (!name.trim()) {
+      alert('Por favor, informe o Nome Completo do membro.');
+      return;
+    }
+    if (!phone.trim()) {
+      alert('Por favor, informe o Telefone/WhatsApp do membro.');
+      return;
+    }
 
     if (editingId) {
       updateCaregiver(
         editingId,
-        { name, relationship, phone, email, receiveNotifications },
+        { name, relationship, phone, email, cpf, shiftHours, notes, receiveNotifications },
         userName
       );
+      setSuccessMsg(`Perfil de ${name} (${relationship}) atualizado com sucesso!`);
     } else {
       addCaregiver(
         {
@@ -79,25 +100,63 @@ export const CaregiverManagement: React.FC = () => {
           relationship,
           phone,
           email,
+          cpf,
+          shiftHours,
+          notes,
           isCurrentlyOnDuty: caregivers.length === 0,
           receiveNotifications,
         },
         userName
       );
+      setSuccessMsg(`Novo membro ${name} registrado com sucesso como ${relationship}!`);
     }
 
     setIsModalOpen(false);
+    setShowInlineForm(false);
     resetForm();
+
+    setTimeout(() => setSuccessMsg(null), 5000);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Deseja remover este responsável do cadastro?')) {
-      deleteCaregiver(id, userName);
-    }
+  const handleOpenDeleteModal = (c: Caregiver) => {
+    setDeletingCaregiver(c);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingCaregiver) return;
+    const targetName = deletingCaregiver.name;
+    const targetRel = deletingCaregiver.relationship;
+
+    deleteCaregiver(deletingCaregiver.id, userName);
+
+    setSuccessMsg(
+      `O cadastro de ${targetName} (${targetRel}) foi excluído com sucesso! Todos os relatórios e logs de medicamentos aplicados foram mantidos intactos no histórico.`
+    );
+    setIsDeleteModalOpen(false);
+    setDeletingCaregiver(null);
+
+    setTimeout(() => setSuccessMsg(null), 6000);
   };
 
   return (
     <div className="space-y-6">
+      {/* Success Notification Alert */}
+      {successMsg && (
+        <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg border-2 border-emerald-400 flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 shrink-0" />
+            <span className="font-extrabold text-xs sm:text-sm">{successMsg}</span>
+          </div>
+          <button
+            onClick={() => setSuccessMsg(null)}
+            className="text-white/80 hover:text-white font-bold text-xs"
+          >
+            ✕ Fechar
+          </button>
+        </div>
+      )}
+
       {/* Active Duty Caregiver Banner */}
       <div className="bg-[#2F7E6A] text-white p-6 rounded-3xl shadow-md border-3 border-[#63C6A7] flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -117,21 +176,195 @@ export const CaregiverManagement: React.FC = () => {
               <p className="text-xs text-white/80 font-semibold mt-0.5 flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-[#BFE8D6]" /> {activeCaregiverOnDuty.phone}
                 <span className="opacity-50">•</span>
-                <Mail className="w-3.5 h-3.5 text-[#BFE8D6]" /> {activeCaregiverOnDuty.email}
+                <Mail className="w-3.5 h-3.5 text-[#BFE8D6]" /> {activeCaregiverOnDuty.email || 'Não informado'}
               </p>
             )}
           </div>
         </div>
 
-        {isAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleOpenCreate}
-            className="px-5 py-3 bg-[#63C6A7] hover:bg-[#52b596] text-[#1F2E2C] font-extrabold text-sm rounded-2xl shadow-lg flex items-center gap-2 transition shrink-0"
+            onClick={() => {
+              if (showInlineForm && !editingId) {
+                setShowInlineForm(false);
+              } else {
+                resetForm();
+                setShowInlineForm(true);
+              }
+            }}
+            className="px-5 py-3 bg-[#63C6A7] hover:bg-[#52b596] text-[#1F2E2C] font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg flex items-center gap-2 transition shrink-0"
           >
-            <Plus className="w-5 h-5 stroke-[3]" /> Cadastrar Responsável
+            <Plus className="w-5 h-5 stroke-[3]" />
+            {showInlineForm && !editingId ? 'Ocultar Formulario' : 'Cadastrar Novo Membro (Perfil Completo)'}
           </button>
-        )}
+        </div>
       </div>
+
+      {/* INLINE REGISTRATION FORM CARD (CADASTRO DIRETO DE NOVO MEMBRO) */}
+      {showInlineForm && (
+        <div className="bg-[#E9F7F2] p-6 rounded-3xl border-3 border-[#63C6A7] shadow-xl space-y-4 animate-fadeIn">
+          <div className="flex items-center justify-between pb-3 border-b border-[#BFE8D6]">
+            <div>
+              <span className="px-2.5 py-1 bg-[#2F7E6A] text-white font-extrabold text-[10px] rounded-md uppercase">
+                {editingId ? 'Edição de Membro' : 'Inclusão de Novo Membro'}
+              </span>
+              <h3 className="text-xl font-black text-[#1F2E2C] mt-1 flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#2F7E6A]" />
+                {editingId ? `Editar Perfil: ${name}` : 'Cadastrar Perfil Completo (Cuidador, Filha/o, Responsável, Curador, Enfermeiro)'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowInlineForm(false);
+                resetForm();
+              }}
+              className="text-gray-500 hover:text-gray-800 font-bold text-xs px-3 py-1 bg-white rounded-xl border border-gray-200"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Quick Role Selection Chips */}
+            <div>
+              <label className="block text-xs font-extrabold text-[#1F2E2C] mb-2">
+                1. Selecione o Papel / Perfil de Cuidado do Membro:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '🩺 Cuidador(a)', val: 'Cuidador' },
+                  { label: '👧 Filha', val: 'Filha' },
+                  { label: '👦 Filho', val: 'Filho' },
+                  { label: '🛡️ Responsável', val: 'Responsável' },
+                  { label: '⚖️ Curador(a)', val: 'Curador' },
+                  { label: '👨‍⚕️ Enfermeiro(a)', val: 'Enfermeiro(a)' },
+                  { label: '💍 Esposa', val: 'Esposa' },
+                  { label: '💍 Marido', val: 'Marido' },
+                  { label: '👥 Outro', val: 'Outro' },
+                ].map((chip) => (
+                  <button
+                    key={chip.val}
+                    type="button"
+                    onClick={() => setRelationship(chip.val as CaregiverRelation)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition border-2 ${
+                      relationship === chip.val
+                        ? 'bg-[#2F7E6A] text-white border-[#2F7E6A] shadow-md scale-105'
+                        : 'bg-white text-[#1F2E2C] border-[#BFE8D6] hover:border-[#63C6A7]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Profile Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Dra. Mariana Souza / João Oliveira"
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Telefone / WhatsApp *</label>
+                <input
+                  type="text"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(11) 99999-8888"
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">CPF do Membro</label>
+                <input
+                  type="text"
+                  value={cpf}
+                  onChange={(e) => setCpf(e.target.value)}
+                  placeholder="000.000.000-00"
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">E-mail para Notificações</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="membro@email.com"
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Turno / Horário de Plantão</label>
+                <input
+                  type="text"
+                  value={shiftHours}
+                  onChange={(e) => setShiftHours(e.target.value)}
+                  placeholder="Ex: 12x36 (07:00 às 19:00)"
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Observações / Instruções</label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Recomendações técnicas ou contatos extras..."
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="receiveNotifInline"
+                checked={receiveNotifications}
+                onChange={(e) => setReceiveNotifications(e.target.checked)}
+                className="w-4 h-4 text-[#2F7E6A] rounded"
+              />
+              <label htmlFor="receiveNotifInline" className="text-xs font-bold text-[#1F2E2C]">
+                Receber alertas de medicação em atraso e relatórios por SMS/WhatsApp/App
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#BFE8D6]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInlineForm(false);
+                  resetForm();
+                }}
+                className="px-4 py-2.5 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-[#2F7E6A] hover:bg-[#256555] text-white font-extrabold rounded-xl text-xs shadow-md flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                {editingId ? 'Salvar Alterações' : 'Confirmar Inclusão do Membro'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Responsibles Directory Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -160,22 +393,22 @@ export const CaregiverManagement: React.FC = () => {
                   </span>
                 </div>
 
-                {isAdmin && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(c)}
-                      className="p-1.5 text-gray-500 hover:text-[#2F7E6A] rounded-lg"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleOpenEdit(c)}
+                    className="p-2 text-gray-500 hover:text-[#2F7E6A] hover:bg-[#E9F7F2] rounded-xl transition"
+                    title="Editar Perfil"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleOpenDeleteModal(c)}
+                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                    title="Excluir Membro (Abre confirmação)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="text-xs text-[#1F2E2C] space-y-1.5 pt-2 border-t border-gray-100">
@@ -183,8 +416,23 @@ export const CaregiverManagement: React.FC = () => {
                   <Phone className="w-4 h-4 text-[#2F7E6A]" /> {c.phone}
                 </p>
                 <p className="flex items-center gap-2 font-semibold">
-                  <Mail className="w-4 h-4 text-[#2F7E6A]" /> {c.email}
+                  <Mail className="w-4 h-4 text-[#2F7E6A]" /> {c.email || 'Não informado'}
                 </p>
+                {c.cpf && (
+                  <p className="flex items-center gap-2 font-semibold text-gray-700">
+                    <ShieldCheck className="w-4 h-4 text-[#2F7E6A]" /> CPF: {c.cpf}
+                  </p>
+                )}
+                {c.shiftHours && (
+                  <p className="flex items-center gap-2 font-semibold text-gray-700">
+                    <UserCheck className="w-4 h-4 text-[#2F7E6A]" /> Turno: {c.shiftHours}
+                  </p>
+                )}
+                {c.notes && (
+                  <p className="text-[11px] font-medium text-gray-600 bg-[#E9F7F2] p-2 rounded-xl border border-[#BFE8D6]">
+                    📝 {c.notes}
+                  </p>
+                )}
                 <p className="flex items-center gap-2 font-semibold text-gray-600">
                   <Bell className="w-4 h-4 text-[#2F7E6A]" /> Alertas SMS/Push:{' '}
                   <strong>{c.receiveNotifications ? 'Ativados' : 'Desativados'}</strong>
@@ -193,7 +441,7 @@ export const CaregiverManagement: React.FC = () => {
             </div>
 
             {/* Set On Duty Button */}
-            {!c.isCurrentlyOnDuty && isAdmin && (
+            {!c.isCurrentlyOnDuty && (
               <button
                 onClick={() => setCaregiverOnDuty(c.id, userName)}
                 className="w-full py-2.5 bg-[#E9F7F2] hover:bg-[#BFE8D6] text-[#2F7E6A] font-extrabold text-xs rounded-xl transition border border-[#63C6A7]"
@@ -205,12 +453,12 @@ export const CaregiverManagement: React.FC = () => {
         ))}
       </div>
 
-      {/* Admin Add / Edit Modal */}
+      {/* Admin Add / Edit Modal Dialogue */}
       {isModalOpen && (
-        <div className="fixed inset-[#0] z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#E9F7F2] rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-[#63C6A7]">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#E9F7F2] rounded-3xl max-w-lg w-full p-6 shadow-2xl border-4 border-[#63C6A7] max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black text-[#1F2E2C] mb-4 pb-2 border-b border-[#BFE8D6]">
-              {editingId ? 'Editar Responsável' : 'Cadastrar Novo Responsável'}
+              {editingId ? 'Editar Perfil do Membro' : 'Cadastrar Novo Membro (Perfil Completo)'}
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -221,39 +469,66 @@ export const CaregiverManagement: React.FC = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: João Oliveira"
+                  placeholder="Ex: Dra. Mariana Souza / João Oliveira"
                   className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Grau de Parentesco / Papel</label>
-                <select
-                  value={relationship}
-                  onChange={(e) => setRelationship(e.target.value as any)}
-                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
-                >
-                  <option value="Filho">Filho</option>
-                  <option value="Filha">Filha</option>
-                  <option value="Esposa">Esposa</option>
-                  <option value="Marido">Marido</option>
-                  <option value="Cuidador">Cuidador</option>
-                  <option value="Curador">Curador</option>
-                  <option value="Enfermeiro">Enfermeiro</option>
-                  <option value="Outro">Outro</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Papel / Perfil no Cuidado *</label>
+                  <select
+                    value={relationship}
+                    onChange={(e) => setRelationship(e.target.value as any)}
+                    className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-bold text-[#2F7E6A]"
+                  >
+                    <option value="Cuidador">Cuidador(a)</option>
+                    <option value="Filha">Filha</option>
+                    <option value="Filho">Filho</option>
+                    <option value="Responsável">Responsável</option>
+                    <option value="Curador">Curador(a)</option>
+                    <option value="Enfermeiro(a)">Enfermeiro(a)</option>
+                    <option value="Esposa">Esposa</option>
+                    <option value="Marido">Marido</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1F2E2C] mb-1">CPF do Membro</label>
+                  <input
+                    type="text"
+                    value={cpf}
+                    onChange={(e) => setCpf(e.target.value)}
+                    placeholder="000.000.000-00"
+                    className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Telefone / WhatsApp *</label>
-                <input
-                  type="text"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(11) 99999-8888"
-                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Telefone / WhatsApp *</label>
+                  <input
+                    type="text"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(11) 99999-8888"
+                    className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Turno / Horário de Trabalho</label>
+                  <input
+                    type="text"
+                    value={shiftHours}
+                    onChange={(e) => setShiftHours(e.target.value)}
+                    placeholder="Ex: 12x36 (07:00 às 19:00)"
+                    className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
+                  />
+                </div>
               </div>
 
               <div>
@@ -262,12 +537,23 @@ export const CaregiverManagement: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="cuidador@email.com"
+                  placeholder="membro@email.com"
                   className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-sm font-semibold"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div>
+                <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Observações / Diretrizes do Cuidado</label>
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Informações adicionais, credenciais ou recomendações de plantão..."
+                  className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-medium"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="receiveNotif"
@@ -276,7 +562,7 @@ export const CaregiverManagement: React.FC = () => {
                   className="w-4 h-4 text-[#2F7E6A] rounded"
                 />
                 <label htmlFor="receiveNotif" className="text-xs font-bold text-[#1F2E2C]">
-                  Receber alertas de medicação em atraso
+                  Receber alertas de medicação em atraso (SMS / App)
                 </label>
               </div>
 
@@ -292,10 +578,71 @@ export const CaregiverManagement: React.FC = () => {
                   type="submit"
                   className="px-6 py-2 bg-[#2F7E6A] text-white font-extrabold rounded-xl text-xs shadow"
                 >
-                  Salvar
+                  Salvar Perfil Completo
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Dialogue: Confirm Deletion of Responsible Member */}
+      {isDeleteModalOpen && deletingCaregiver && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-rose-500 animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-rose-100">
+              <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl shrink-0">
+                <Trash2 className="w-7 h-7 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Confirmar Exclusão</h3>
+                <p className="text-xs font-bold text-rose-600">Caixa de Diálogo de Confirmação</p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50/70 p-4 rounded-2xl border border-rose-200 space-y-2">
+              <p className="text-sm font-extrabold text-gray-900">
+                Tem certeza de que deseja excluir o cadastro de:
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-rose-200 space-y-1">
+                <p className="font-black text-base text-[#1F2E2C]">{deletingCaregiver.name}</p>
+                <p className="text-xs font-bold text-[#2F7E6A]">Papel: {deletingCaregiver.relationship}</p>
+                {deletingCaregiver.phone && (
+                  <p className="text-xs font-semibold text-gray-600">Contato: {deletingCaregiver.phone}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-300 space-y-1">
+              <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-xs">
+                <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Garantia de Integridade e Histórico Médico</span>
+              </div>
+              <p className="text-[11px] font-bold text-amber-800 leading-relaxed">
+                A exclusão deste cadastro <strong>não apagará</strong> os logs de medicamentos já aplicados por este responsável. O nome <strong>{deletingCaregiver.name}</strong> permanecerá registrado no histórico permanente e relatórios de auditoria.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeletingCaregiver(null);
+                }}
+                className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl text-xs shadow-md transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}

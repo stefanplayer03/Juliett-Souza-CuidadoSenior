@@ -6,21 +6,30 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
+        "adminId": { "type": "string" },
+        "username": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "user"] },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "user"] },
+        "phone": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "mustChangePassword": { "type": "boolean" },
+        "securityQuestion": { "type": "string" },
+        "securityAnswer": { "type": "string" },
         "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "updatedAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
     },
     "Patient": {
       "title": "Patient",
-      "description": "Patient medical and personal profile",
+      "description": "Patient medical and personal profile attached to a Clinical Admin",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
         "fullName": { "type": "string" },
         "cpf": { "type": "string" },
         "birthDate": { "type": "string" },
@@ -41,14 +50,18 @@
     },
     "Caregiver": {
       "title": "Caregiver",
-      "description": "Caregiver or family responsible profile",
+      "description": "Caregiver or family responsible profile attached to a Clinical Admin",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
         "name": { "type": "string" },
-        "relationship": { "type": "string", "enum": ["Filho", "Filha", "Esposa", "Marido", "Cuidador", "Curador", "Enfermeiro", "Outro"] },
+        "relationship": { "type": "string", "enum": ["Cuidador", "Filha", "Filho", "Responsável", "Curador", "Enfermeiro(a)", "Esposa", "Marido", "Outro"] },
         "phone": { "type": "string" },
         "email": { "type": "string" },
+        "cpf": { "type": "string" },
+        "shiftHours": { "type": "string" },
+        "notes": { "type": "string" },
         "isCurrentlyOnDuty": { "type": "boolean" },
         "receiveNotifications": { "type": "boolean" },
         "createdAt": { "type": "string" },
@@ -58,10 +71,11 @@
     },
     "Doctor": {
       "title": "Doctor",
-      "description": "Attending doctor record",
+      "description": "Attending doctor record attached to a Clinical Admin",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
         "name": { "type": "string" },
         "specialty": { "type": "string" },
         "crm": { "type": "string" },
@@ -75,10 +89,12 @@
     },
     "Medication": {
       "title": "Medication",
-      "description": "Medication prescription schedule details",
+      "description": "Medication prescription schedule details attached to Admin and Patient",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "patientId": { "type": "string" },
         "name": { "type": "string" },
         "photo": { "type": "string" },
         "dosage": { "type": "string" },
@@ -90,6 +106,7 @@
         "endDate": { "type": "string" },
         "treatmentDurationDays": { "type": "number" },
         "isContinuous": { "type": "boolean" },
+        "isMedicalPrep": { "type": "boolean" },
         "timingInstruction": { "type": "string", "enum": ["Antes da refeição", "Depois da refeição", "Em jejum", "Durante a refeição", "Indiferente"] },
         "notes": { "type": "string" },
         "createdAt": { "type": "string" },
@@ -99,10 +116,12 @@
     },
     "MedicalRecord": {
       "title": "MedicalRecord",
-      "description": "Detailed medical chart entry for medication",
+      "description": "Detailed medical chart entry for medication attached to Admin and Patient",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "patientId": { "type": "string" },
         "medicationId": { "type": "string" },
         "reason": { "type": "string" },
         "symptoms": { "type": "string" },
@@ -118,12 +137,37 @@
         "updatedAt": { "type": "string" }
       }
     },
+    "MedicalAppointment": {
+      "title": "MedicalAppointment",
+      "description": "Appointments and exam schedules attached to Admin and Patient",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "type": { "type": "string", "enum": ["consulta", "exame"] },
+        "title": { "type": "string" },
+        "specialtyOrExam": { "type": "string" },
+        "doctorOrClinic": { "type": "string" },
+        "addressOrLocation": { "type": "string" },
+        "dateTime": { "type": "string" },
+        "prepInstructions": { "type": "string" },
+        "status": { "type": "string", "enum": ["agendado", "concluido", "cancelado"] },
+        "attachmentUrl": { "type": "string" },
+        "attachmentName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
     "Schedule": {
       "title": "Schedule",
       "description": "Individual medication log administration instance",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "patientId": { "type": "string" },
         "medicationId": { "type": "string" },
         "medicationName": { "type": "string" },
         "dosage": { "type": "string" },
@@ -145,6 +189,8 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "patientId": { "type": "string" },
         "timestamp": { "type": "string" },
         "userName": { "type": "string" },
         "actionType": { "type": "string" },
@@ -160,7 +206,7 @@
     },
     "/patients/{patientId}": {
       "schema": { "$ref": "#/entities/Patient" },
-      "description": "Patient medical profile"
+      "description": "Patient medical profile attached to Clinical Admin"
     },
     "/caregivers/{caregiverId}": {
       "schema": { "$ref": "#/entities/Caregiver" },
@@ -177,6 +223,10 @@
     "/medical_records/{recordId}": {
       "schema": { "$ref": "#/entities/MedicalRecord" },
       "description": "Medical records and prescriptions"
+    },
+    "/medical_appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/MedicalAppointment" },
+      "description": "Medical appointments and exam schedules"
     },
     "/schedules/{scheduleId}": {
       "schema": { "$ref": "#/entities/Schedule" },

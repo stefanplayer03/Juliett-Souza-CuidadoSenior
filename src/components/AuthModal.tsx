@@ -55,7 +55,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-[#0] z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#E9F7F2] rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-[#63C6A7] relative">
         <button
           onClick={onClose}
@@ -71,27 +71,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
           <p className="text-xs text-[#2F7E6A] font-semibold mt-1">
             Sistema de Autenticação Firebase
           </p>
-        </div>
-
-        {/* Quick Demo Access Toggles */}
-        <div className="my-4 bg-white p-3 rounded-2xl border-2 border-[#BFE8D6] space-y-2">
-          <span className="text-[11px] font-bold text-gray-500 uppercase block text-center">
-            Acesso Rápido de Teste (Sem Custo)
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleDemo('admin')}
-              className="py-2 px-3 bg-[#2F7E6A] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow"
-            >
-              <Shield className="w-3.5 h-3.5 text-[#BFE8D6]" /> Entrar como Admin
-            </button>
-            <button
-              onClick={() => handleDemo('user')}
-              className="py-2 px-3 bg-[#63C6A7] text-[#1F2E2C] font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow"
-            >
-              <User className="w-3.5 h-3.5" /> Entrar como Cuidador
-            </button>
-          </div>
         </div>
 
         {message && (

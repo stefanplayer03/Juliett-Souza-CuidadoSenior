@@ -9,6 +9,7 @@ import {
   Type,
   WifiOff,
   Shield,
+  ShieldCheck,
   User,
   LogOut,
   Calendar,
@@ -19,6 +20,7 @@ import {
   HeartPulse,
   Settings as SettingsIcon,
   Download,
+  KeyRound
 } from 'lucide-react';
 import { audioService } from '../services/audio';
 
@@ -39,7 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   deferredPrompt,
   onInstallPWA,
 }) => {
-  const { currentUser, role, logout, switchRole } = useAuth();
+  const { currentUser, role, isSuperAdmin, isAdmin, logout, switchRole } = useAuth();
   const {
     patient,
     activeCaregiverOnDuty,
@@ -67,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 shadow-sm border-b border-[#BFE8D6]" style={{ backgroundColor: '#2F7E6A' }}>
-      {/* Top Banner: Active Patient & Duty Caregiver Info */}
+      {/* Top Banner: Active Patient & Duty Caregiver Info & System Status */}
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between text-white text-xs sm:text-sm bg-black/10 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 font-medium">
@@ -93,32 +95,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           {deferredPrompt && (
             <button
               onClick={onInstallPWA}
-              className="flex items-center gap-1 bg-[#63C6A7] hover:bg-[#52b596] text-[#1F2E2C] text-xs font-bold px-2.5 py-1 rounded-full transition shadow-sm"
+              className="flex items-center gap-1 bg-[#63C6A7] hover:bg-[#52b596] text-[#1F2E2C] text-xs font-bold px-2.5 py-1 rounded-full transition shadow-sm cursor-pointer"
               title="Instalar aplicativo PWA"
             >
               <Download className="w-3.5 h-3.5" /> Instalar App
             </button>
           )}
 
-          <div className="flex items-center bg-white/10 rounded-lg p-0.5">
-            <button
-              onClick={() => switchRole('admin')}
-              className={`px-2 py-0.5 text-xs rounded font-medium transition ${
-                role === 'admin' ? 'bg-[#63C6A7] text-[#1F2E2C] font-bold' : 'text-white hover:bg-white/10'
-              }`}
-              title="Visão com permissões completas de Administrador"
-            >
-              <Shield className="w-3 h-3 inline mr-1" /> Admin
-            </button>
-            <button
-              onClick={() => switchRole('user')}
-              className={`px-2 py-0.5 text-xs rounded font-medium transition ${
-                role === 'user' ? 'bg-[#63C6A7] text-[#1F2E2C] font-bold' : 'text-white hover:bg-white/10'
-              }`}
-              title="Visão simplificada do Paciente/Cuidador"
-            >
-              <User className="w-3 h-3 inline mr-1" /> Usuário
-            </button>
+          {/* User Role Pill Tag */}
+          <div className="flex items-center bg-white/15 px-2.5 py-0.5 rounded-lg text-xs">
+            {role === 'superadmin' ? (
+              <span className="text-[#BFE8D6] font-extrabold flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#63C6A7]" /> Super ADMIN
+              </span>
+            ) : role === 'admin' ? (
+              <span className="text-[#BFE8D6] font-bold flex items-center gap-1">
+                <Shield className="w-3.5 h-3.5 text-[#63C6A7]" /> Administrador
+              </span>
+            ) : (
+              <span className="text-white font-medium flex items-center gap-1">
+                <User className="w-3.5 h-3.5" /> Cuidador
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -177,18 +175,29 @@ export const Navbar: React.FC<NavbarProps> = ({
             <SettingsIcon className="w-4 h-4 text-[#BFE8D6]" />
           </button>
 
-          {/* User Auth Info */}
+          {/* User Auth Info / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/20">
-              <img
-                src={currentUser.photoURL || 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=100'}
-                alt={currentUser.displayName}
-                className="w-8 h-8 rounded-full border-2 border-[#63C6A7] object-cover"
-              />
+              <div className="flex items-center gap-2">
+                <img
+                  src={currentUser.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100'}
+                  alt={currentUser.displayName}
+                  className="w-8 h-8 rounded-full border-2 border-[#63C6A7] object-cover"
+                />
+                <div className="hidden md:block text-left">
+                  <div className="text-xs font-bold text-white leading-tight truncate max-w-[120px]">
+                    {currentUser.displayName}
+                  </div>
+                  <div className="text-[10px] text-[#BFE8D6] font-mono leading-tight">
+                    @{currentUser.username || 'usuario'}
+                  </div>
+                </div>
+              </div>
+
               <button
                 onClick={logout}
-                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
-                title="Sair da conta"
+                className="p-2 text-white/80 hover:text-white hover:bg-rose-600/80 rounded-xl transition cursor-pointer"
+                title="Sair da conta e voltar ao login"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -294,6 +303,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <History className="w-4 h-4" /> Histórico Auditável
           </button>
+
+          {/* Super Admin & Admin User Control Tab */}
+          {isAdmin && (
+            <button
+              onClick={() => { audioService.playClickSound(); setActiveTab('users'); }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition ${
+                activeTab === 'users'
+                  ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-300'
+                  : 'bg-purple-900/40 text-purple-200 hover:bg-purple-900/60'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" /> Gestão de Usuários
+            </button>
+          )}
         </div>
       </nav>
     </header>

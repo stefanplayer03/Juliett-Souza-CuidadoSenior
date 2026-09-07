@@ -17,7 +17,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { settings, updateSettings, isOffline } = useApp();
 
   return (
-    <div className="fixed inset-[#0] z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#E9F7F2] rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-[#63C6A7] relative space-y-4">
         <button
           onClick={onClose}
