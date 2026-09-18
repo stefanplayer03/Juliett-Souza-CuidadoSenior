@@ -1,9 +1,15 @@
-export type UserRole = 'superadmin' | 'admin' | 'user';
+export type UserRole = 'superadmin' | 'admin' | 'user' | 'paciente' | 'responsavel' | 'cuidador';
 
 export interface UserProfile {
   uid: string;
-  adminId?: string; // ID do Administrador Clínico responsável (se o usuário for cuidador/operador)
-  username: string; // e.g. "Juliett.Souza"
+  adminId?: string; // ID do Administrador Clínico responsável (se houver)
+  patientId?: string; // ID do Paciente vinculado (para subcadastros de responsáveis, cuidadores e familiares)
+  isSubAccount?: boolean; // Verdadeiro se for um subcadastro criado dentro do perfil do paciente principal
+  isPrimaryPatientAccount?: boolean; // Verdadeiro se for o cadastro titular do paciente
+  relationship?: string; // e.g. "Filha", "Cuidador", "Esposa", "Responsável"
+  canAdministerMeds?: boolean; // Permissão para confirmar doses de medicamentos
+  canEditData?: boolean; // Permissão para alterar cadastros
+  username: string; // e.g. "Juliett.Souza" ou "maria.filha"
   email: string;
   displayName: string;
   photoURL?: string;
@@ -31,6 +37,7 @@ export const SECURITY_QUESTIONS = [
 
 export interface Patient {
   id: string;
+  userId?: string; // ID do usuário associado à conta do paciente (Cadastro Principal)
   adminId?: string; // ID do Administrador Clínico ao qual o paciente está atrelado
   fullName: string;
   cpf: string;
@@ -45,6 +52,7 @@ export interface Patient {
   allergies: string[];
   diseases: string[];
   notes: string;
+  isFirstSetupCompleted?: boolean; // Se o paciente já finalizou o primeiro cadastro de responsáveis, ficha e medicamentos
   createdAt: string;
   updatedAt: string;
 }
@@ -63,7 +71,12 @@ export type CaregiverRelation =
 export interface Caregiver {
   id: string;
   adminId?: string; // ID do Administrador Clínico responsável
-  patientId?: string; // ID do Paciente vinculado
+  patientId?: string; // ID do Paciente vinculado (Cadastro Principal)
+  userId?: string; // ID da conta de usuário de acesso
+  username?: string; // Login de acesso individual do responsável (ex: maria.filha)
+  accessPassword?: string; // Senha de acesso individual configurada
+  canAdministerMeds?: boolean; // Pode dar baixa em remédios
+  canEditData?: boolean;
   name: string;
   relationship: CaregiverRelation;
   phone: string;
@@ -73,6 +86,7 @@ export interface Caregiver {
   notes?: string;
   isCurrentlyOnDuty: boolean;
   receiveNotifications: boolean;
+  photo?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,6 +136,7 @@ export interface Medication {
   treatmentDurationDays?: number;
   isContinuous: boolean;
   isMedicalPrep?: boolean;
+  soundAlarmEnabled?: boolean;
   timingInstruction: TimingInstruction;
   notes: string;
   createdAt: string;
@@ -183,6 +198,11 @@ export interface ScheduleItem {
   scheduledDate: string; // YYYY-MM-DD
   scheduledTime: string; // HH:mm
   status: ScheduleStatus;
+  isContinuous?: boolean;
+  treatmentDurationDays?: number;
+  startDate?: string;
+  endDate?: string;
+  soundAlarmEnabled?: boolean;
   administeredAt?: string; // ISO string or HH:mm
   administeredBy?: string;
   responsibleRole?: CaregiverRelation | 'Paciente';

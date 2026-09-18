@@ -24,8 +24,10 @@ import {
   Sparkles,
   RefreshCw,
   X,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Camera,
 } from 'lucide-react';
+import { ProfilePhotoModal } from './ProfilePhotoModal';
 
 export const UserManagement: React.FC = () => {
   const {
@@ -39,7 +41,9 @@ export const UserManagement: React.FC = () => {
     isSuperAdmin,
   } = useAuth();
 
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings, patients } = useApp();
+
+  const isGeneralAdmin = currentUser?.username?.toLowerCase() === 'juliett.souza';
 
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +56,11 @@ export const UserManagement: React.FC = () => {
   const [isResetPassModalOpen, setIsResetPassModalOpen] = useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
 
+  // Photo modal states for user management
+  const [editingPhotoUser, setEditingPhotoUser] = useState<UserProfile | null>(null);
+  const [isPhotoModalForUserOpen, setIsPhotoModalForUserOpen] = useState(false);
+  const [isFormPhotoModalOpen, setIsFormPhotoModalOpen] = useState(false);
+
   // Selected user for editing / resetting
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
@@ -61,6 +70,7 @@ export const UserManagement: React.FC = () => {
     username: '',
     email: '',
     phone: '',
+    photoURL: '',
     role: 'user' as UserRole,
     password: '',
     mustChangePassword: true,
@@ -87,6 +97,18 @@ export const UserManagement: React.FC = () => {
     setErrorMsg(msg);
     setSuccessMsg(null);
   };
+
+  if (!isGeneralAdmin) {
+    return (
+      <div className="bg-white rounded-3xl p-8 border-2 border-rose-200 text-center max-w-lg mx-auto shadow-sm my-12">
+        <ShieldCheck className="w-12 h-12 text-rose-500 mx-auto mb-3" />
+        <h3 className="text-lg font-black text-[#1F2E2C]">Acesso Restrito ao Administrador Geral</h3>
+        <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+          O único perfil com Administrador Geral é <strong>Juliett.Souza</strong>, e somente esse perfil possui acesso a todas as contas cadastradas no aplicativo. As demais contas inseridas possuem perfil de usuário com acesso aos dados do paciente cadastrado.
+        </p>
+      </div>
+    );
+  }
 
   // Filtered users list
   const filteredUsers = usersList.filter((u) => {
@@ -119,6 +141,7 @@ export const UserManagement: React.FC = () => {
       username: '',
       email: '',
       phone: '',
+      photoURL: '',
       role: 'user',
       password: 'Senha' + Math.floor(100 + Math.random() * 900),
       mustChangePassword: true,
@@ -138,6 +161,7 @@ export const UserManagement: React.FC = () => {
       username: user.username,
       email: user.email,
       phone: user.phone || '',
+      photoURL: user.photoURL || '',
       role: user.role,
       password: '',
       mustChangePassword: !!user.mustChangePassword,
@@ -175,6 +199,7 @@ export const UserManagement: React.FC = () => {
         username: formData.username.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
+        photoURL: formData.photoURL ? formData.photoURL.trim() : undefined,
         role: formData.role,
         password: formData.password,
         mustChangePassword: formData.mustChangePassword,
@@ -207,6 +232,7 @@ export const UserManagement: React.FC = () => {
         username: formData.username.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
+        photoURL: formData.photoURL ? formData.photoURL.trim() : undefined,
         role: formData.role,
         mustChangePassword: formData.mustChangePassword,
         securityQuestion: formData.securityQuestion,
@@ -447,11 +473,24 @@ export const UserManagement: React.FC = () => {
                       {/* User details */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                            alt={user.displayName}
-                            className="w-10 h-10 rounded-full border-2 border-[#63C6A7] object-cover shrink-0"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPhotoUser(user);
+                              setIsPhotoModalForUserOpen(true);
+                            }}
+                            className="relative group cursor-pointer shrink-0"
+                            title="Clique para trocar ou editar a foto de perfil deste usuário"
+                          >
+                            <img
+                              src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                              alt={user.displayName}
+                              className="w-10 h-10 rounded-full border-2 border-[#63C6A7] object-cover group-hover:opacity-80 transition shadow-xs"
+                            />
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+                              <Camera className="w-3.5 h-3.5" />
+                            </div>
+                          </button>
                           <div>
                             <div className="font-extrabold text-sm text-[#1F2E2C] flex items-center gap-1.5">
                               {user.displayName}
@@ -480,6 +519,26 @@ export const UserManagement: React.FC = () => {
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-teal-100 text-teal-900 border border-teal-300">
                             <Shield className="w-3.5 h-3.5 text-teal-700" /> Administrador
                           </span>
+                        ) : user.role === 'paciente' || user.isPrimaryPatientAccount ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                              <User className="w-3.5 h-3.5 text-amber-700" /> Paciente Titular
+                            </span>
+                            {user.patientId && (
+                              <div className="text-[10px] text-gray-500 font-bold">
+                                ID: {user.patientId}
+                              </div>
+                            )}
+                          </div>
+                        ) : user.isSubAccount || user.patientId ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                              <Users className="w-3.5 h-3.5 text-emerald-700" /> Subcadastro
+                            </span>
+                            <div className="text-[10px] text-gray-600 font-medium">
+                              Paciente: <strong>{patients.find((p) => p.id === user.patientId)?.fullName || user.patientId}</strong>
+                            </div>
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-blue-100 text-blue-900 border border-blue-200">
                             <User className="w-3.5 h-3.5 text-blue-700" /> Cuidador / Usuário
@@ -549,6 +608,18 @@ export const UserManagement: React.FC = () => {
                             <Edit2 className="w-4 h-4" />
                           </button>
 
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPhotoUser(user);
+                              setIsPhotoModalForUserOpen(true);
+                            }}
+                            className="p-1.5 text-blue-700 hover:bg-blue-50 rounded-lg border border-blue-200 transition cursor-pointer"
+                            title="Alterar Foto de Perfil"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </button>
+
                           {!isSuper && (
                             <button
                               type="button"
@@ -602,6 +673,28 @@ export const UserManagement: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveNewUser} className="space-y-3">
+              {/* Photo Selector */}
+              <div className="bg-white p-3 rounded-2xl border-2 border-[#63C6A7] flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={formData.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                    alt="Foto do perfil"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#2F7E6A] shadow-xs"
+                  />
+                  <div>
+                    <label className="block text-xs font-black text-[#1F2E2C]">Foto de Perfil</label>
+                    <p className="text-[11px] text-gray-500 font-semibold">Tire foto, envie arquivo do celular ou escolha avatar</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFormPhotoModalOpen(true)}
+                  className="px-3 py-1.5 bg-[#2F7E6A] hover:bg-[#256555] text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
+                >
+                  <Camera className="w-4 h-4 text-[#63C6A7]" /> Escolher Foto
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#1F2E2C] uppercase mb-1">
@@ -671,9 +764,14 @@ export const UserManagement: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full p-2.5 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold focus:outline-none"
                   >
-                    <option value="user">Cuidador / Usuário (Operacional)</option>
-                    <option value="admin">Administrador (Clínico)</option>
+                    <option value="user">Usuário Geral / Cuidador</option>
+                    <option value="paciente">Paciente Titular</option>
+                    <option value="cuidador">Cuidador (Subcadastro do Paciente)</option>
+                    <option value="responsavel">Responsável Familiar (Subcadastro do Paciente)</option>
                   </select>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    * Administrador Geral é exclusivo de Juliett.Souza. Todas as novas contas recebem perfil usuário.
+                  </p>
                 </div>
 
                 <div>
@@ -767,6 +865,28 @@ export const UserManagement: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveEditUser} className="space-y-3">
+              {/* Photo Selector */}
+              <div className="bg-white p-3 rounded-2xl border-2 border-[#63C6A7] flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={formData.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                    alt="Foto do perfil"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#2F7E6A] shadow-xs"
+                  />
+                  <div>
+                    <label className="block text-xs font-black text-[#1F2E2C]">Foto de Perfil</label>
+                    <p className="text-[11px] text-gray-500 font-semibold">Tire foto, envie arquivo do celular ou escolha avatar</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFormPhotoModalOpen(true)}
+                  className="px-3 py-1.5 bg-[#2F7E6A] hover:bg-[#256555] text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
+                >
+                  <Camera className="w-4 h-4 text-[#63C6A7]" /> Escolher Foto
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-[#1F2E2C] uppercase mb-1">
@@ -816,13 +936,18 @@ export const UserManagement: React.FC = () => {
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                    disabled={selectedUser.role === 'superadmin'}
+                    disabled={selectedUser.username.toLowerCase() === 'juliett.souza'}
                     className="w-full p-2.5 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-semibold focus:outline-none disabled:bg-gray-100 disabled:text-gray-500"
                   >
-                    <option value="user">Cuidador / Usuário</option>
-                    <option value="admin">Administrador</option>
-                    {selectedUser.role === 'superadmin' && (
-                      <option value="superadmin">Super Administrador</option>
+                    {selectedUser.username.toLowerCase() === 'juliett.souza' ? (
+                      <option value="superadmin">Administradora Geral (Exclusivo Juliett.Souza)</option>
+                    ) : (
+                      <>
+                        <option value="user">Usuário Geral / Cuidador</option>
+                        <option value="paciente">Paciente Titular</option>
+                        <option value="cuidador">Cuidador (Subcadastro do Paciente)</option>
+                        <option value="responsavel">Responsável Familiar (Subcadastro do Paciente)</option>
+                      </>
                     )}
                   </select>
                 </div>
@@ -1030,6 +1155,49 @@ export const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal to edit photo directly for a user */}
+      {editingPhotoUser && (
+        <ProfilePhotoModal
+          isOpen={isPhotoModalForUserOpen}
+          onClose={() => {
+            setIsPhotoModalForUserOpen(false);
+            setEditingPhotoUser(null);
+          }}
+          currentPhoto={editingPhotoUser.photoURL}
+          userName={editingPhotoUser.displayName}
+          userRole={editingPhotoUser.role}
+          userLogin={editingPhotoUser.username}
+          title={`Foto de ${editingPhotoUser.displayName}`}
+          subtitle="Troque ou personalize a foto de perfil deste usuário do sistema."
+          onSavePhoto={async (newPhotoUrl) => {
+            try {
+              const res = await updateUser(editingPhotoUser.uid, { photoURL: newPhotoUrl });
+              if (res.success) {
+                showSuccess(`Foto de ${editingPhotoUser.displayName} atualizada com sucesso!`);
+              } else {
+                showError(res.error || 'Erro ao atualizar foto.');
+              }
+            } catch (err: any) {
+              showError(err.message || 'Erro ao salvar foto.');
+            }
+          }}
+        />
+      )}
+
+      {/* Modal to pick photo inside create/edit user form */}
+      <ProfilePhotoModal
+        isOpen={isFormPhotoModalOpen}
+        onClose={() => setIsFormPhotoModalOpen(false)}
+        currentPhoto={formData.photoURL}
+        userName={formData.displayName || 'Novo Usuário'}
+        userRole={formData.role}
+        userLogin={formData.username}
+        title="Escolher Foto de Perfil"
+        subtitle="Carregue foto do dispositivo, cole link ou selecione um avatar para este usuário."
+        onSavePhoto={(newPhotoUrl) => {
+          setFormData((prev) => ({ ...prev, photoURL: newPhotoUrl }));
+        }}
+      />
     </div>
   );
 };

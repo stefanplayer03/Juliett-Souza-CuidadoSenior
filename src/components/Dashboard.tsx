@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { ScheduleItem } from '../types';
 import { MedicationConfirmModal } from './MedicationConfirmModal';
+import { AdminPatientsRoster } from './AdminPatientsRoster';
 import {
   Clock,
   CheckCircle2,
@@ -25,9 +27,13 @@ export const Dashboard: React.FC = () => {
     activeCaregiverOnDuty,
     caregivers,
     confirmScheduleAdministered,
+    toggleScheduleSoundAlarm,
     pendingConfirmationSchedule,
     setPendingConfirmationSchedule,
+    setIsFirstSetupOpen,
   } = useApp();
+
+  const { isAdmin, isSuperAdmin } = useAuth();
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'administered' | 'missed'>('all');
 
@@ -275,6 +281,36 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Incomplete Patient First Setup Banner */}
+      {patient.isFirstSetupCompleted === false && (
+        <div className="bg-gradient-to-r from-amber-50 to-emerald-50 border-2 border-amber-300 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-amber-200 text-amber-900 rounded-2xl shrink-0">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-amber-950 flex items-center gap-1.5">
+                Primeiro Cadastro de Paciente Pendente: {patient.fullName}
+              </h4>
+              <p className="text-xs text-amber-900 font-medium leading-relaxed">
+                Cadastre seus responsáveis familiares, sua ficha médica e seus medicamentos para ativar todos os horários e alarmes com segurança.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsFirstSetupOpen(true)}
+            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md transition whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+          >
+            <Sparkles className="w-4 h-4" /> Completar Meu Cadastro Agora
+          </button>
+        </div>
+      )}
+
+      {/* Admin Panel: Lista Geral de Pacientes Cadastrados (Extrema Importância solicitada pelo Administrador) */}
+      {(isAdmin || isSuperAdmin) && (
+        <AdminPatientsRoster />
+      )}
+
       {/* Mini Calendar Strip with Status Indicators */}
       <div className="bg-white rounded-3xl p-5 border-2 border-[#BFE8D6] shadow-sm space-y-3">
         <div className="flex items-center justify-between">
@@ -408,6 +444,30 @@ export const Dashboard: React.FC = () => {
                         <span className="px-2 py-0.5 bg-[#BFE8D6]/60 rounded-md">
                           {item.timingInstruction}
                         </span>
+                        {item.isContinuous ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-md">
+                            🔄 Uso contínuo
+                          </span>
+                        ) : item.treatmentDurationDays ? (
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 font-bold rounded-md">
+                            ⏳ {item.treatmentDurationDays} dias
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleScheduleSoundAlarm(item.id, item.medicationId);
+                          }}
+                          className={`px-2 py-0.5 rounded-md border text-[11px] font-extrabold transition cursor-pointer flex items-center gap-1 ${
+                            item.soundAlarmEnabled !== false
+                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                              : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                          }`}
+                          title="Clique para alternar o alarme sonoro deste medicamento"
+                        >
+                          {item.soundAlarmEnabled !== false ? '🔔 Alarme Ativo' : '🔕 Silenciado'}
+                        </button>
                       </div>
                     </div>
                   </div>

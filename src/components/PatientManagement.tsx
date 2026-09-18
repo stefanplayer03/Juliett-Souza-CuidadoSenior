@@ -28,7 +28,9 @@ import {
   Users,
   ShieldAlert,
   Sparkles,
+  Camera,
 } from 'lucide-react';
+import { ProfilePhotoModal } from './ProfilePhotoModal';
 
 export const PatientManagement: React.FC = () => {
   const {
@@ -61,6 +63,8 @@ export const PatientManagement: React.FC = () => {
   const [newPatientId, setNewPatientId] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newDisease, setNewDisease] = useState('');
+  const [isPatientPhotoModalOpen, setIsPatientPhotoModalOpen] = useState(false);
+  const [isFormPatientPhotoModalOpen, setIsFormPatientPhotoModalOpen] = useState(false);
 
   // Filter logs for the active patient
   const patientLogs = historyLogs.filter(
@@ -274,17 +278,35 @@ export const PatientManagement: React.FC = () => {
       {/* PATIENT HEADER & TAB SELECTOR (FICHA MEDICA, MENU DE LOG, RELATORIO DIARIO) */}
       <div className="bg-white p-6 rounded-3xl border-3 border-[#63C6A7] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <img
-            src={patient.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300'}
-            alt={patient.fullName}
-            className="w-16 h-16 rounded-full object-cover border-4 border-[#63C6A7] shadow-md"
-          />
+          <button
+            type="button"
+            onClick={() => setIsPatientPhotoModalOpen(true)}
+            className="relative group cursor-pointer shrink-0"
+            title="Clique para editar ou trocar a foto do paciente"
+          >
+            <img
+              src={patient.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300'}
+              alt={patient.fullName}
+              className="w-16 h-16 rounded-full object-cover border-4 border-[#63C6A7] shadow-md group-hover:opacity-80 transition"
+            />
+            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+              <Camera className="w-5 h-5" />
+            </div>
+          </button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 bg-[#2F7E6A] text-white font-black text-xs rounded-md">
                 ID: {patient.id}
               </span>
               <span className="text-xs font-bold text-[#2F7E6A]">CPF: {patient.cpf}</span>
+              <button
+                type="button"
+                onClick={() => setIsPatientPhotoModalOpen(true)}
+                className="text-[11px] font-bold text-[#2F7E6A] hover:underline flex items-center gap-1 cursor-pointer bg-[#E9F7F2] px-2 py-0.5 rounded-md border border-[#BFE8D6]"
+                title="Trocar Foto do Paciente"
+              >
+                <Camera className="w-3 h-3 text-[#2F7E6A]" /> Trocar Foto
+              </button>
             </div>
             <h2 className="text-2xl font-black text-[#1F2E2C] mt-0.5">{patient.fullName}</h2>
             <p className="text-xs text-gray-500 font-semibold">
@@ -631,13 +653,21 @@ export const PatientManagement: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#1F2E2C] mb-1">URL Foto</label>
-              <input
-                type="url"
-                value={formData.photo}
-                onChange={(e) => setFormData({ ...formData, photo: e.target.value })}
-                className="w-full p-2.5 bg-[#E9F7F2] border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
-              />
+              <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Foto de Perfil</label>
+              <div className="flex items-center gap-2">
+                <img
+                  src={formData.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100'}
+                  alt="Foto"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-[#63C6A7] shrink-0 shadow-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsFormPatientPhotoModalOpen(true)}
+                  className="flex-1 py-2 px-3 bg-[#E9F7F2] hover:bg-[#BFE8D6] text-[#2F7E6A] border-2 border-[#63C6A7] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition"
+                >
+                  <Camera className="w-3.5 h-3.5" /> Escolher Foto
+                </button>
+              </div>
             </div>
           </div>
 
@@ -735,6 +765,24 @@ export const PatientManagement: React.FC = () => {
                 className="w-full p-2.5 bg-[#E9F7F2] border-2 border-[#63C6A7] rounded-xl text-xs font-semibold"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Foto de Perfil</label>
+              <div className="flex items-center gap-2">
+                <img
+                  src={formData.photo || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100'}
+                  alt="Foto"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-[#63C6A7] shrink-0 shadow-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsFormPatientPhotoModalOpen(true)}
+                  className="flex-1 py-2 px-3 bg-[#E9F7F2] hover:bg-[#BFE8D6] text-[#2F7E6A] border-2 border-[#63C6A7] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition"
+                >
+                  <Camera className="w-3.5 h-3.5" /> Escolher Foto
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#BFE8D6]">
@@ -754,6 +802,36 @@ export const PatientManagement: React.FC = () => {
           </div>
         </form>
       )}
+
+      {/* Modal to edit active patient's photo */}
+      <ProfilePhotoModal
+        isOpen={isPatientPhotoModalOpen}
+        onClose={() => setIsPatientPhotoModalOpen(false)}
+        currentPhoto={patient.photo}
+        userName={patient.fullName}
+        userRole="Paciente"
+        userLogin={`ID: ${patient.id}`}
+        title={`Foto de ${patient.fullName}`}
+        subtitle="Troque ou personalize a foto de perfil do paciente."
+        onSavePhoto={(newPhotoUrl) => {
+          updatePatient(patient.id, { photo: newPhotoUrl }, userName);
+        }}
+      />
+
+      {/* Modal to select photo in form */}
+      <ProfilePhotoModal
+        isOpen={isFormPatientPhotoModalOpen}
+        onClose={() => setIsFormPatientPhotoModalOpen(false)}
+        currentPhoto={formData.photo}
+        userName={formData.fullName || 'Paciente'}
+        userRole="Paciente"
+        userLogin={formData.id ? `ID: ${formData.id}` : undefined}
+        title="Escolher Foto do Paciente"
+        subtitle="Carregue foto do dispositivo, cole link ou selecione um avatar para o paciente."
+        onSavePhoto={(newPhotoUrl) => {
+          setFormData((prev) => ({ ...prev, photo: newPhotoUrl }));
+        }}
+      />
     </div>
   );
 };

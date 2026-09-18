@@ -39,40 +39,46 @@ service cloud.firestore {
       allow delete: if isClinicalAdmin();
     }
 
-    // Patients Collection - linked to Clinical Admin
+    // Patients Collection - linked to Clinical Admin or self-registered patient
     match /patients/{patientId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Caregivers Collection
     match /caregivers/{caregiverId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Doctors Collection
     match /doctors/{doctorId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Medications Collection
     match /medications/{medicationId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Medical Records Collection
     match /medical_records/{recordId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Medical Appointments and Exams Collection
     match /medical_appointments/{appointmentId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isClinicalAdmin();
+      allow create, update: if isSignedIn();
+      allow delete: if isClinicalAdmin();
     }
 
     // Schedules Collection

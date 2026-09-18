@@ -23,7 +23,21 @@ interface AuthContextType {
   completeFirstSetup: (newPassword: string, securityQuestion: string, securityAnswer: string) => Promise<{ success: boolean; error?: string }>;
   getSecurityQuestionForUser: (identifier: string) => string | null;
   recoverPasswordWithQuestion: (identifier: string, answer: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  registerUser: (userData: Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (userData: Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; user?: UserProfile }>;
+  createOrUpdateSubUserForPatient: (
+    patientId: string,
+    data: {
+      userId?: string;
+      name: string;
+      relationship: string;
+      username: string;
+      password?: string;
+      email?: string;
+      phone?: string;
+      canAdministerMeds?: boolean;
+    }
+  ) => Promise<{ success: boolean; user?: UserProfile; error?: string }>;
+  deleteSubUserForPatient: (userId: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (uid: string, data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
   deleteUser: (uid: string) => Promise<{ success: boolean; error?: string }>;
   toggleUserStatus: (uid: string) => Promise<{ success: boolean; error?: string }>;
@@ -39,13 +53,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Initial Super Admin & Demo System Users
+// Initial Super Admin & Demo System Users with explicit Patient Principals and Subcadastros
 const INITIAL_SYSTEM_USERS: UserProfile[] = [
   {
     uid: 'user_superadmin_juliett',
     username: 'Juliett.Souza',
     email: 'juliett.souza@cuidadosenior.app',
-    displayName: 'Juliett Souza (Super Administradora)',
+    displayName: 'Juliett Souza (Administradora Geral)',
     photoURL: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
     role: 'superadmin',
     password: 'F@milia26',
@@ -59,13 +73,15 @@ const INITIAL_SYSTEM_USERS: UserProfile[] = [
     lastLoginAt: undefined,
   },
   {
-    uid: 'user_admin_dra_ana',
-    adminId: 'user_admin_dra_ana',
+    uid: 'user_dra_ana',
+    patientId: 'PAC-8842',
+    isSubAccount: true,
+    relationship: 'Médica Assistente',
     username: 'dra.ana',
     email: 'dra.ana@cuidadosenior.app',
-    displayName: 'Dra. Ana Costa (Administradora Médica)',
+    displayName: 'Dra. Ana Costa (Médica Assistente)',
     photoURL: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150',
-    role: 'admin',
+    role: 'user',
     password: 'Medico2026',
     mustChangePassword: false,
     securityQuestion: 'Qual é o primeiro nome da sua mãe?',
@@ -76,30 +92,78 @@ const INITIAL_SYSTEM_USERS: UserProfile[] = [
     updatedAt: new Date().toISOString(),
   },
   {
-    uid: 'user_cuidador_joao',
-    adminId: 'user_admin_dra_ana',
-    username: 'joao.cuidador',
-    email: 'joao.cuidador@cuidadosenior.app',
-    displayName: 'João Oliveira (Cuidador de Plantão)',
-    photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    role: 'user',
-    password: 'Cuidador123',
+    uid: 'user_paciente_francisca',
+    patientId: 'PAC-8842',
+    isSubAccount: false,
+    isPrimaryPatientAccount: true,
+    username: 'dona.francisca',
+    email: 'francisca.alves@cuidadosenior.app',
+    displayName: 'Dona Francisca Alves de Souza (Paciente Principal)',
+    photoURL: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+    role: 'paciente',
+    password: 'Francisca2026',
     mustChangePassword: false,
     securityQuestion: 'Qual é a cidade em que você nasceu?',
-    securityAnswer: 'sao paulo',
+    securityAnswer: 'campinas',
     isActive: true,
-    phone: '(11) 98888-1111',
+    phone: '(11) 98765-4321',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    uid: 'user_paciente_alzira',
+    patientId: 'PAC-4421',
+    isSubAccount: false,
+    isPrimaryPatientAccount: true,
+    username: 'dona.alzira',
+    email: 'alzira.oliveira@cuidadosenior.app',
+    displayName: 'Dona Alzira Maria de Oliveira (Paciente Principal)',
+    photoURL: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150',
+    role: 'paciente',
+    password: 'Alzira2026',
+    mustChangePassword: false,
+    securityQuestion: 'Qual é o primeiro nome da sua mãe?',
+    securityAnswer: 'maria',
+    isActive: true,
+    phone: '(11) 96666-5555',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    uid: 'user_irani_cuidadora',
+    patientId: 'PAC-4421', // Subcadastro vinculado à paciente Dona Alzira
+    isSubAccount: true,
+    relationship: 'Cuidadora',
+    canAdministerMeds: true,
+    canEditData: true,
+    adminId: 'user_admin_dra_ana',
+    username: 'irani.cuidadora',
+    email: 'irani.simoes@cuidadosenior.app',
+    displayName: 'Irani Simões (Cuidadora - Dona Alzira)',
+    photoURL: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
+    role: 'cuidador',
+    password: 'Irani2026',
+    mustChangePassword: false,
+    securityQuestion: 'Qual é a cidade em que você nasceu?',
+    securityAnswer: 'santos',
+    isActive: true,
+    phone: '(11) 95555-4444',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     uid: 'user_familiar_maria',
+    patientId: 'PAC-8842', // Subcadastro vinculado à paciente Dona Francisca
+    isSubAccount: true,
+    relationship: 'Filha',
+    canAdministerMeds: true,
+    canEditData: true,
     adminId: 'user_admin_dra_ana',
     username: 'maria.filha',
     email: 'maria.santos@cuidadosenior.app',
-    displayName: 'Maria Santos (Filha Responsável)',
+    displayName: 'Maria Santos Alves (Filha Responsável - Dona Francisca)',
     photoURL: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-    role: 'user',
+    role: 'responsavel',
     password: 'Familia2026',
     mustChangePassword: false,
     securityQuestion: 'Qual foi o modelo do seu primeiro carro?',
@@ -108,11 +172,33 @@ const INITIAL_SYSTEM_USERS: UserProfile[] = [
     phone: '(11) 97777-2222',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+  },
+  {
+    uid: 'user_cuidador_joao',
+    patientId: 'PAC-8842', // Subcadastro vinculado à paciente Dona Francisca
+    isSubAccount: true,
+    relationship: 'Cuidador',
+    canAdministerMeds: true,
+    canEditData: true,
+    adminId: 'user_admin_dra_ana',
+    username: 'joao.cuidador',
+    email: 'joao.cuidador@cuidadosenior.app',
+    displayName: 'João Oliveira (Cuidador de Plantão - Dona Francisca)',
+    photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    role: 'cuidador',
+    password: 'Cuidador123',
+    mustChangePassword: false,
+    securityQuestion: 'Qual é a cidade em que você nasceu?',
+    securityAnswer: 'sao paulo',
+    isActive: true,
+    phone: '(11) 98888-1111',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load registered users list from localStorage
+  // Load registered users list from localStorage and merge default initial accounts
   const [usersList, setUsersList] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('cs_system_users');
     if (!saved) {
@@ -120,16 +206,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return INITIAL_SYSTEM_USERS;
     }
     try {
-      const parsed = JSON.parse(saved);
-      // Ensure Juliett.Souza is present
-      const hasJuliett = parsed.some((u: UserProfile) => u.username?.toLowerCase() === 'juliett.souza');
-      if (!hasJuliett) {
-        const merged = [INITIAL_SYSTEM_USERS[0], ...parsed];
-        localStorage.setItem('cs_system_users', JSON.stringify(merged));
-        return merged;
+      const parsed: UserProfile[] = JSON.parse(saved);
+      let updated = [...parsed];
+      let changed = false;
+      INITIAL_SYSTEM_USERS.forEach((initialUser) => {
+        const foundIndex = updated.findIndex(
+          (u) => u.username.toLowerCase() === initialUser.username.toLowerCase()
+        );
+        if (foundIndex === -1) {
+          updated.push(initialUser);
+          changed = true;
+        } else {
+          // Keep patientId and relationship synchronized
+          if (initialUser.patientId && !updated[foundIndex].patientId) {
+            updated[foundIndex] = {
+              ...updated[foundIndex],
+              patientId: initialUser.patientId,
+              isSubAccount: initialUser.isSubAccount,
+              relationship: initialUser.relationship,
+            };
+            changed = true;
+          }
+        }
+      });
+      // Enforce: ONLY Juliett.Souza has superadmin/admin. All other accounts must have user/paciente role.
+      updated = updated.map((u) => {
+        if (u.username.toLowerCase() === 'juliett.souza') {
+          if (u.role !== 'superadmin') {
+            changed = true;
+            return { ...u, role: 'superadmin' as UserRole, displayName: 'Juliett Souza (Administradora Geral)' };
+          }
+          return u;
+        } else {
+          if (u.role === 'superadmin' || u.role === 'admin') {
+            changed = true;
+            return { ...u, role: 'user' as UserRole };
+          }
+          return u;
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem('cs_system_users', JSON.stringify(updated));
       }
-      return parsed;
+      return updated;
     } catch {
+      localStorage.setItem('cs_system_users', JSON.stringify(INITIAL_SYSTEM_USERS));
       return INITIAL_SYSTEM_USERS;
     }
   });
@@ -138,10 +260,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = localStorage.getItem('cs_user');
     if (saved) {
       try {
-        const u = JSON.parse(saved);
+        const u: UserProfile = JSON.parse(saved);
         if (u?.mustChangePassword) {
           localStorage.removeItem('cs_user');
           return null;
+        }
+        // Enforce rule: ONLY Juliett.Souza can be superadmin/admin. Other accounts must have user role.
+        if (u.username?.toLowerCase() !== 'juliett.souza' && (u.role === 'superadmin' || u.role === 'admin')) {
+          const sanitized = { ...u, role: 'user' as UserRole };
+          localStorage.setItem('cs_user', JSON.stringify(sanitized));
+          return sanitized;
         }
         return u;
       } catch {
@@ -380,7 +508,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const registerUser = async (
     userData: Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'>
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; user?: UserProfile }> => {
     const cleanUsername = userData.username.trim();
     const cleanEmail = userData.email.trim().toLowerCase();
 
@@ -393,20 +521,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Já existe um usuário com este Nome de Usuário ou E-mail.' };
     }
 
-    const assignedRole = userData.role || 'admin';
-    const assignedAdminId = userData.adminId || (currentUser?.role === 'admin' ? currentUser.uid : undefined);
+    // STRICT ROLE CONTROL:
+    // O UNICO PERFIL COM ADMINISTRADOR GERAL É O JULIETT.SOUZA.
+    // Todas as demais contas precisam ter perfil usuário/paciente.
+    const isJuliett = cleanUsername.toLowerCase() === 'juliett.souza';
+    let assignedRole: UserRole = 'user';
+    if (isJuliett) {
+      assignedRole = 'superadmin';
+    } else if (userData.role && ['user', 'paciente', 'cuidador', 'responsavel'].includes(userData.role)) {
+      assignedRole = userData.role;
+    } else {
+      assignedRole = 'user';
+    }
 
     const now = new Date().toISOString();
     const uid = `user_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
     const newUser: UserProfile = {
       ...userData,
       uid,
-      adminId: assignedAdminId || (assignedRole === 'admin' ? uid : undefined),
+      adminId: 'user_superadmin_juliett',
       username: cleanUsername,
       email: cleanEmail,
       role: assignedRole,
       isActive: userData.isActive ?? true,
-      mustChangePassword: userData.mustChangePassword !== undefined ? userData.mustChangePassword : (assignedRole === 'admin' ? false : true),
+      mustChangePassword: userData.mustChangePassword !== undefined ? userData.mustChangePassword : false,
       securityAnswer: userData.securityAnswer ? userData.securityAnswer.trim().toLowerCase() : undefined,
       createdAt: now,
       updatedAt: now,
@@ -414,6 +552,125 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUsersList((prev) => [newUser, ...prev]);
     firestoreUsers.save(newUser);
+    return { success: true, user: newUser };
+  };
+
+  /**
+   * Create or update a sub-account (Responsável, Cuidador, Parente)
+   * explicitly linked to a primary Patient's profile
+   */
+  const createOrUpdateSubUserForPatient = async (
+    patientId: string,
+    data: {
+      userId?: string;
+      name: string;
+      relationship: string;
+      username: string;
+      password?: string;
+      email?: string;
+      phone?: string;
+      canAdministerMeds?: boolean;
+    }
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> => {
+    const cleanUsername = data.username.trim();
+    const cleanEmail = (data.email && data.email.trim())
+      ? data.email.trim().toLowerCase()
+      : `${cleanUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}@cuidadosenior.app`;
+
+    // 1. If existing userId is provided or match by userId
+    if (data.userId) {
+      const existing = usersList.find((u) => u.uid === data.userId);
+      if (existing) {
+        const updated: UserProfile = {
+          ...existing,
+          displayName: `${data.name.trim()} (${data.relationship})`,
+          username: cleanUsername,
+          email: cleanEmail,
+          phone: data.phone || existing.phone,
+          relationship: data.relationship,
+          canAdministerMeds: data.canAdministerMeds ?? true,
+          password: data.password ? data.password.trim() : existing.password,
+          patientId,
+          isSubAccount: true,
+          role: data.relationship === 'Cuidador' || data.relationship === 'Enfermeiro(a)' ? 'cuidador' : 'responsavel',
+          updatedAt: new Date().toISOString(),
+        };
+        setUsersList((prev) => prev.map((u) => (u.uid === updated.uid ? updated : u)));
+        firestoreUsers.save(updated);
+        return { success: true, user: updated };
+      }
+    }
+
+    // 2. Check duplicate username for a different account
+    const usernameTaken = usersList.some(
+      (u) => u.username.toLowerCase() === cleanUsername.toLowerCase() && u.uid !== data.userId
+    );
+    if (usernameTaken) {
+      // If it exists and is already this patient's subuser, update it
+      const existingSub = usersList.find(
+        (u) => u.username.toLowerCase() === cleanUsername.toLowerCase() && u.patientId === patientId
+      );
+      if (existingSub) {
+        const updated: UserProfile = {
+          ...existingSub,
+          displayName: `${data.name.trim()} (${data.relationship})`,
+          relationship: data.relationship,
+          canAdministerMeds: data.canAdministerMeds ?? true,
+          password: data.password ? data.password.trim() : existingSub.password,
+          phone: data.phone || existingSub.phone,
+          updatedAt: new Date().toISOString(),
+        };
+        setUsersList((prev) => prev.map((u) => (u.uid === updated.uid ? updated : u)));
+        firestoreUsers.save(updated);
+        return { success: true, user: updated };
+      }
+
+      return {
+        success: false,
+        error: `O login de usuário "${cleanUsername}" já está em uso por outro membro do sistema. Escolha outro.`,
+      };
+    }
+
+    // 3. Create fresh sub-account
+    const now = new Date().toISOString();
+    const uid = data.userId || `user_sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const role: UserRole =
+      data.relationship === 'Cuidador' || data.relationship === 'Enfermeiro(a)'
+        ? 'cuidador'
+        : 'responsavel';
+
+    const newSubUser: UserProfile = {
+      uid,
+      patientId,
+      isSubAccount: true,
+      relationship: data.relationship,
+      canAdministerMeds: data.canAdministerMeds ?? true,
+      canEditData: true,
+      displayName: `${data.name.trim()} (${data.relationship})`,
+      username: cleanUsername,
+      email: cleanEmail,
+      role,
+      password: data.password ? data.password.trim() : 'Familia2026',
+      isActive: true,
+      mustChangePassword: false,
+      securityQuestion: 'Qual é o primeiro nome da sua mãe?',
+      securityAnswer: 'mae',
+      phone: data.phone,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setUsersList((prev) => [newSubUser, ...prev]);
+    firestoreUsers.save(newSubUser);
+    return { success: true, user: newSubUser };
+  };
+
+  /**
+   * Delete or deactivate a sub-user when caregiver is removed
+   */
+  const deleteSubUserForPatient = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    setUsersList((prev) => prev.filter((u) => u.uid !== userId));
+    firestoreUsers.delete(userId);
     return { success: true };
   };
 
@@ -425,9 +682,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsersList((prev) =>
       prev.map((u) => {
         if (u.uid === uid) {
+          const isJuliett = u.username.toLowerCase() === 'juliett.souza';
+          let finalRole = u.role;
+          if (data.role) {
+            if (isJuliett) {
+              finalRole = 'superadmin';
+            } else if (['user', 'paciente', 'cuidador', 'responsavel'].includes(data.role)) {
+              finalRole = data.role;
+            } else {
+              finalRole = 'user';
+            }
+          }
+
           const updated = {
             ...u,
             ...data,
+            role: finalRole,
             securityAnswer: data.securityAnswer ? data.securityAnswer.trim().toLowerCase() : u.securityAnswer,
             updatedAt: new Date().toISOString(),
           };
@@ -587,6 +857,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = (newRole: UserRole) => {
     if (!currentUser) return;
+    if (currentUser.username?.toLowerCase() !== 'juliett.souza' && (newRole === 'superadmin' || newRole === 'admin')) {
+      return;
+    }
     const updated = { ...currentUser, role: newRole };
     setCurrentUser(updated);
     setUsersList((prev) => prev.map((u) => (u.uid === updated.uid ? updated : u)));
@@ -595,20 +868,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const demoLogin = (demoRole: UserRole) => {
     if (demoRole === 'superadmin') {
-      const u = usersList.find((x) => x.role === 'superadmin') || INITIAL_SYSTEM_USERS[0];
-      setCurrentUser(u);
-    } else if (demoRole === 'admin') {
-      const u = usersList.find((x) => x.role === 'admin') || INITIAL_SYSTEM_USERS[1];
+      const u = usersList.find((x) => x.username.toLowerCase() === 'juliett.souza') || INITIAL_SYSTEM_USERS[0];
       setCurrentUser(u);
     } else {
-      const u = usersList.find((x) => x.role === 'user') || INITIAL_SYSTEM_USERS[2];
+      const u = usersList.find((x) => x.username.toLowerCase() === 'dona.francisca') || INITIAL_SYSTEM_USERS[2];
       setCurrentUser(u);
     }
   };
 
-  const role = currentUser?.role || 'user';
-  const isSuperAdmin = role === 'superadmin';
-  const isAdmin = role === 'superadmin' || role === 'admin';
+  const isGeneralAdmin = currentUser?.username?.toLowerCase() === 'juliett.souza';
+  const role: UserRole = isGeneralAdmin
+    ? 'superadmin'
+    : (currentUser?.role === 'superadmin' || currentUser?.role === 'admin' ? 'user' : (currentUser?.role || 'user'));
+  const isSuperAdmin = isGeneralAdmin;
+  const isAdmin = isGeneralAdmin;
 
   return (
     <AuthContext.Provider
@@ -624,6 +897,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getSecurityQuestionForUser,
         recoverPasswordWithQuestion,
         registerUser,
+        createOrUpdateSubUserForPatient,
+        deleteSubUserForPatient,
         updateUser,
         deleteUser,
         toggleUserStatus,

@@ -1,0 +1,410 @@
+import fs from 'fs';
+import path from 'path';
+import { Resvg } from '@resvg/resvg-js';
+
+const width = 1920;
+const height = 1080;
+
+const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="50%" stop-color="#F0FDF4" />
+      <stop offset="100%" stop-color="#F0FDFA" />
+    </linearGradient>
+
+    <linearGradient id="primaryHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0F766E" />
+      <stop offset="100%" stop-color="#0D9488" />
+    </linearGradient>
+
+    <linearGradient id="stage1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </linearGradient>
+    
+    <linearGradient id="stage2Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D9488" />
+      <stop offset="100%" stop-color="#0F766E" />
+    </linearGradient>
+
+    <linearGradient id="stage3Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <linearGradient id="stage4Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+
+    <linearGradient id="stage5Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EC4899" />
+      <stop offset="100%" stop-color="#BE185D" />
+    </linearGradient>
+
+    <linearGradient id="stage6Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <!-- Filters for Cards -->
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.06" />
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0F172A" flood-opacity="0.04" />
+    </filter>
+
+    <filter id="topShadow" x="-2%" y="-5%" width="104%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0F766E" flood-opacity="0.15" />
+    </filter>
+
+    <!-- Marker Arrow -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#0D9488" />
+    </marker>
+    <marker id="arrowLoop" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748B" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="${width}" height="${height}" fill="url(#bgGrad)" />
+
+  <!-- Subtle Grid Pattern -->
+  <g opacity="0.25">
+    <line x1="0" y1="180" x2="${width}" y2="180" stroke="#CBD5E1" stroke-dasharray="6,6" />
+    <line x1="0" y1="560" x2="${width}" y2="560" stroke="#CBD5E1" stroke-dasharray="6,6" />
+    <line x1="0" y1="940" x2="${width}" y2="940" stroke="#CBD5E1" stroke-dasharray="6,6" />
+  </g>
+
+  <!-- ================= TOP HEADER BANNER ================= -->
+  <g filter="url(#topShadow)">
+    <rect x="60" y="40" width="1800" height="110" rx="18" fill="url(#primaryHeader)" />
+    
+    <!-- Decorative Icon / Symbol -->
+    <g transform="translate(95, 67)">
+      <rect width="56" height="56" rx="14" fill="#FFFFFF" fill-opacity="0.18" />
+      <path d="M 28 14 L 28 42 M 14 28 L 42 28" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" />
+    </g>
+
+    <text x="175" y="85" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF" letter-spacing="0.5">
+      FLUXOGRAMA METODOLÓGICO DO PROJETO DE PESQUISA E DESENVOLVIMENTO
+    </text>
+    <text x="175" y="122" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#CCFBF1">
+      Projeto: CuidadoSenior • Sistema PWA para Gestão Medicamentosa, Alertas Multissensoriais e Apoio a Cuidadores
+    </text>
+
+    <!-- Version / Category Tag -->
+    <rect x="1630" y="72" width="190" height="46" rx="10" fill="#FFFFFF" fill-opacity="0.15" />
+    <text x="1725" y="101" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">
+      METODOLOGIA APLICADA
+    </text>
+  </g>
+
+  <!-- ================= FLOW PIPELINE: 6 STAGES ================= -->
+
+  <!-- Connectors (Arrows between Stage 1, 2, 3) -->
+  <path d="M 610 330 L 680 330" stroke="#0D9488" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+  <path d="M 1240 330 L 1310 330" stroke="#0D9488" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+
+  <!-- Connector (Down from Stage 3 to Stage 4) -->
+  <path d="M 1580 490 L 1580 540 L 1580 570" stroke="#0D9488" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+
+  <!-- Connectors (Arrows between Stage 4, 5, 6 - right to left) -->
+  <path d="M 1310 730 L 1240 730" stroke="#0D9488" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+  <path d="M 680 730 L 610 730" stroke="#0D9488" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+
+  <!-- Feedback Loop (Iterative improvement from Stage 5 back to Stage 4) -->
+  <path d="M 335 890 L 335 920 L 960 920 L 960 890" stroke="#64748B" stroke-width="2.5" stroke-dasharray="6,6" fill="none" marker-end="url(#arrowLoop)" />
+  <rect x="580" y="905" width="220" height="30" rx="8" fill="#F1F5F9" stroke="#CBD5E1" />
+  <text x="690" y="925" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#475569" text-anchor="middle">
+    Ciclo de Feedback &amp; Refatoração
+  </text>
+
+  <!-- ==================== CARD 1 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="60" y="180" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 60 196 A 16 16 0 0 1 76 180 L 594 180 A 16 16 0 0 1 610 196 L 610 242 L 60 242 Z" fill="url(#stage1Grad)" />
+    <text x="85" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#BAE6FD" letter-spacing="1">ETAPA 01</text>
+    <text x="175" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Definição do Setor e Campo de Estudo</text>
+
+    <!-- Body items -->
+    <g transform="translate(85, 268)">
+      <circle cx="6" cy="6" r="5" fill="#0284C7" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Setor de Aplicação:</text>
+      <text x="168" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Saúde Digital, Geriatria e Assistência Domiciliar.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#0284C7" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Campo de Estudo:</text>
+      <text x="160" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Adesão farmacológica e polifarmácia em idosos.</text>
+
+      <circle cx="6" cy="78" r="5" fill="#0284C7" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Problema Observado:</text>
+      <text x="180" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Esquecimento de doses, erros e isolamento do cuidador.</text>
+
+      <circle cx="6" cy="114" r="5" fill="#0284C7" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Técnicas Empregadas:</text>
+      <text x="185" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Revisão bibliográfica, entrevistas e análise de diretrizes.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="85" y="432" width="500" height="38" rx="8" fill="#F0F9FF" stroke="#BAE6FD" />
+    <text x="100" y="456" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#0369A1">
+      ★ Entrega: Matriz de Problemas e Diretrizes Iniciais de Gerontologia
+    </text>
+  </g>
+
+  <!-- ==================== CARD 2 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="690" y="180" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 690 196 A 16 16 0 0 1 706 180 L 1224 180 A 16 16 0 0 1 1240 196 L 1240 242 L 690 242 Z" fill="url(#stage2Grad)" />
+    <text x="715" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#CCFBF1" letter-spacing="1">ETAPA 02</text>
+    <text x="805" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Objetivo do Trabalho e Requisitos</text>
+
+    <!-- Body items -->
+    <g transform="translate(715, 268)">
+      <circle cx="6" cy="6" r="5" fill="#0D9488" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Objetivo Geral:</text>
+      <text x="140" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Desenvolver PWA inclusivo com alertas e relatórios.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#0D9488" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Requisitos Funcionais:</text>
+      <text x="185" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Cadastro de remédios, alarmes, controle de estoque.</text>
+
+      <circle cx="6" cy="78" r="5" fill="#0D9488" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Acessibilidade Sênior:</text>
+      <text x="185" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Tipografia ampliada, botões >48px, alto contraste.</text>
+
+      <circle cx="6" cy="114" r="5" fill="#0D9488" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Modelo de Governança:</text>
+      <text x="200" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Papeis de Administrador Clínico, Cuidador e Idoso.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="715" y="432" width="500" height="38" rx="8" fill="#F0FDFA" stroke="#99F6E4" />
+    <text x="730" y="456" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#0F766E">
+      ★ Entrega: Especificação de Requisitos e Critérios de Acessibilidade
+    </text>
+  </g>
+
+  <!-- ==================== CARD 3 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="1310" y="180" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 1310 196 A 16 16 0 0 1 1326 180 L 1844 180 A 16 16 0 0 1 1860 196 L 1860 242 L 1310 242 Z" fill="url(#stage3Grad)" />
+    <text x="1335" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#D1FAE5" letter-spacing="1">ETAPA 03</text>
+    <text x="1425" y="218" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Modelagem de Dados e Arquitetura</text>
+
+    <!-- Body items -->
+    <g transform="translate(1335, 268)">
+      <circle cx="6" cy="6" r="5" fill="#10B981" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Identificação dos Dados:</text>
+      <text x="200" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Medicamentos, dosagens, horários, histórico de logs.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#10B981" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Banco de Dados Cloud:</text>
+      <text x="195" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Firestore NoSQL (sincronização em tempo real).</text>
+
+      <circle cx="6" cy="78" r="5" fill="#10B981" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Segurança &amp; RBAC:</text>
+      <text x="175" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Regras de segurança atômicas (Security Rules).</text>
+
+      <circle cx="6" cy="114" r="5" fill="#10B981" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Arquitetura de Software:</text>
+      <text x="205" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Client-Centric PWA, Single-Page App e Camada de Context.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="1335" y="432" width="500" height="38" rx="8" fill="#ECFDF5" stroke="#A7F3D0" />
+    <text x="1350" y="456" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#065F46">
+      ★ Entrega: Diagrama ER, Esquema NoSQL e Matriz de Permissões
+    </text>
+  </g>
+
+  <!-- ==================== CARD 4 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="1310" y="580" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 1310 596 A 16 16 0 0 1 1326 580 L 1844 580 A 16 16 0 0 1 1860 596 L 1860 642 L 1310 642 Z" fill="url(#stage4Grad)" />
+    <text x="1335" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#E0E7FF" letter-spacing="1">ETAPA 04</text>
+    <text x="1425" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Desenvolvimento e Recursos Tecnológicos</text>
+
+    <!-- Body items -->
+    <g transform="translate(1335, 668)">
+      <circle cx="6" cy="6" r="5" fill="#6366F1" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Frontend &amp; Tipagem:</text>
+      <text x="180" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">React 19, TypeScript estrito, TailwindCSS v4.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#6366F1" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Multissensorialidade:</text>
+      <text x="180" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Web Audio API (bips com frequências perceptíveis).</text>
+
+      <circle cx="6" cy="78" r="5" fill="#6366F1" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Módulos do Sistema:</text>
+      <text x="180" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Dispensa, Horários, Estoque, Painel de Cuidadores.</text>
+
+      <circle cx="6" cy="114" r="5" fill="#6366F1" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Capacidades PWA:</text>
+      <text x="165" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Manifest, Service Workers e suporte a uso offline.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="1335" y="832" width="500" height="38" rx="8" fill="#EEF2FF" stroke="#C7D2FE" />
+    <text x="1350" y="856" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#4338CA">
+      ★ Entrega: Código-Fonte Modularizado, PWA Instalável e Audio Engine
+    </text>
+  </g>
+
+  <!-- ==================== CARD 5 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="690" y="580" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 690 596 A 16 16 0 0 1 706 580 L 1224 580 A 16 16 0 0 1 1240 596 L 1240 642 L 690 642 Z" fill="url(#stage5Grad)" />
+    <text x="715" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FCE7F3" letter-spacing="1">ETAPA 05</text>
+    <text x="805" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Testes, Validação e Avaliação com Usuários</text>
+
+    <!-- Body items -->
+    <g transform="translate(715, 668)">
+      <circle cx="6" cy="6" r="5" fill="#EC4899" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Testes de Usabilidade:</text>
+      <text x="185" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Avaliação heurística e testes práticos com idosos.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#EC4899" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Métrica SUS (Usability):</text>
+      <text x="200" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Escala System Usability Scale para validar clareza.</text>
+
+      <circle cx="6" cy="78" r="5" fill="#EC4899" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Testes de Carga &amp; Rede:</text>
+      <text x="200" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Simulação de falha de conexão e persistência local.</text>
+
+      <circle cx="6" cy="114" r="5" fill="#EC4899" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Aferição de Eficácia:</text>
+      <text x="180" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Taxa de sucesso na confirmação de remédios.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="715" y="832" width="500" height="38" rx="8" fill="#FDF2F8" stroke="#FBCFE8" />
+    <text x="730" y="856" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#9D174D">
+      ★ Entrega: Relatório de Validação SUS e Métricas de Redução de Erros
+    </text>
+  </g>
+
+  <!-- ==================== CARD 6 ==================== -->
+  <g filter="url(#cardShadow)">
+    <rect x="60" y="580" width="550" height="310" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Header of Card -->
+    <path d="M 60 596 A 16 16 0 0 1 76 580 L 594 580 A 16 16 0 0 1 610 596 L 610 642 L 60 642 Z" fill="url(#stage6Grad)" />
+    <text x="85" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FEF3C7" letter-spacing="1">ETAPA 06</text>
+    <text x="175" y="618" font-family="'Segoe UI', Roboto, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF">Implantação, Distribuição e Monitoramento</text>
+
+    <!-- Body items -->
+    <g transform="translate(85, 668)">
+      <circle cx="6" cy="6" r="5" fill="#F59E0B" />
+      <text x="24" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Hospedagem em Nuvem:</text>
+      <text x="195" y="11" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Cloud Run / CDN com suporte a HTTPS e SSL.</text>
+
+      <circle cx="6" cy="42" r="5" fill="#F59E0B" />
+      <text x="24" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Instalação Facilitada:</text>
+      <text x="180" y="47" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Adicionar à tela de início sem lojas complexas.</text>
+
+      <circle cx="6" cy="78" r="5" fill="#F59E0B" />
+      <text x="24" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Segurança &amp; LGPD:</text>
+      <text x="165" y="83" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Proteção de dados de saúde e registros anonimizados.</text>
+
+      <circle cx="6" cy="114" r="5" fill="#F59E0B" />
+      <text x="24" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#0F172A">Manutenção Contínua:</text>
+      <text x="190" y="119" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400" fill="#334155">Atualização de bulas, regras de dosagem e novos perfis.</text>
+    </g>
+
+    <!-- Footer pill -->
+    <rect x="85" y="832" width="500" height="38" rx="8" fill="#FFFBEB" stroke="#FDE68A" />
+    <text x="100" y="856" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#B45309">
+      ★ Entrega: Sistema em Produção Ativo e Protocolo de Uso Clínico
+    </text>
+  </g>
+
+  <!-- ================= BOTTOM SUMMARY TABLE ================= -->
+  <g filter="url(#cardShadow)">
+    <rect x="60" y="940" width="1800" height="100" rx="14" fill="#1E293B" />
+
+    <!-- 5 Columns matching the user's methodology questions -->
+    <g transform="translate(90, 960)">
+      <text x="0" y="16" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">1. SETOR DE APLICAÇÃO</text>
+      <text x="0" y="42" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#F8FAFC">Saúde &amp; Gerontologia</text>
+      <text x="0" y="62" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="400" fill="#CBD5E1">Cuidado domiciliar a idosos</text>
+    </g>
+
+    <line x1="420" y1="955" x2="420" y2="1025" stroke="#334155" stroke-width="1.5" />
+
+    <g transform="translate(450, 960)">
+      <text x="0" y="16" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">2. OBJETIVO DO TRABALHO</text>
+      <text x="0" y="42" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#F8FAFC">Adesão Medicamentosa</text>
+      <text x="0" y="62" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="400" fill="#CBD5E1">Redução de esquecimentos e erros</text>
+    </g>
+
+    <line x1="780" y1="955" x2="780" y2="1025" stroke="#334155" stroke-width="1.5" />
+
+    <g transform="translate(810, 960)">
+      <text x="0" y="16" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">3. CAMPO DE ESTUDO</text>
+      <text x="0" y="42" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#F8FAFC">Ergonomia &amp; UX Sênior</text>
+      <text x="0" y="62" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="400" fill="#CBD5E1">Acessibilidade cognitiva e motora</text>
+    </g>
+
+    <line x1="1140" y1="955" x2="1140" y2="1025" stroke="#334155" stroke-width="1.5" />
+
+    <g transform="translate(1170, 960)">
+      <text x="0" y="16" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">4. DADOS TRABALHADOS</text>
+      <text x="0" y="42" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#F8FAFC">Prescrições &amp; Registros</text>
+      <text x="0" y="62" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="400" fill="#CBD5E1">Horários, dosagens e logs diários</text>
+    </g>
+
+    <line x1="1500" y1="955" x2="1500" y2="1025" stroke="#334155" stroke-width="1.5" />
+
+    <g transform="translate(1530, 960)">
+      <text x="0" y="16" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="1">5. RECURSOS NECESSÁRIOS</text>
+      <text x="0" y="42" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#38BDF8">React, PWA &amp; Firebase</text>
+      <text x="0" y="62" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="400" fill="#CBD5E1">TypeScript, Tailwind, Web Audio</text>
+    </g>
+  </g>
+</svg>
+`;
+
+async function main() {
+  const publicDir = path.join(process.cwd(), 'public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+
+  // 1. Save SVG
+  const svgPath = path.join(publicDir, 'diagrama_metodologia.svg');
+  fs.writeFileSync(svgPath, svg.trim(), 'utf-8');
+  console.log(`Saved SVG to ${svgPath}`);
+
+  // 2. Render PNG with resvg
+  const resvg = new Resvg(svg, {
+    fitTo: {
+      mode: 'width',
+      value: width,
+    },
+    font: {
+      loadSystemFonts: true,
+      defaultFontFamily: 'sans-serif',
+    },
+  });
+
+  const pngData = resvg.render();
+  const pngBuffer = pngData.asPng();
+
+  const pngPath = path.join(publicDir, 'diagrama_metodologia.png');
+  fs.writeFileSync(pngPath, pngBuffer);
+  console.log(`Saved PNG (${pngBuffer.length} bytes) to ${pngPath}`);
+}
+
+main().catch((err) => {
+  console.error('Error generating diagram:', err);
+  process.exit(1);
+});

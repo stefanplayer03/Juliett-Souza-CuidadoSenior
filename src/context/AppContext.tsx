@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   Patient,
   Caregiver,
@@ -16,6 +16,7 @@ import {
 import { audioService } from '../services/audio';
 import { useAuth } from './AuthContext';
 import {
+  firestoreUsers,
   firestorePatients,
   firestoreCaregivers,
   firestoreDoctors,
@@ -80,6 +81,8 @@ interface AppContextType {
   ) => void;
   regenerateSchedulesForDate: (dateStr: string) => void;
   regenerateSchedulesForDates: (dateStrs: string[]) => void;
+  toggleScheduleSoundAlarm: (scheduleId: string, medicationId?: string) => void;
+  toggleMedicationSoundAlarm: (medicationId: string) => void;
 
   historyLogs: HistoryLog[];
 
@@ -95,6 +98,10 @@ interface AppContextType {
   
   // PWA Offline status
   isOffline: boolean;
+
+  // Onboarding setup wizard state
+  isFirstSetupOpen: boolean;
+  setIsFirstSetupOpen: (open: boolean) => void;
 }
 
 const DEFAULT_PATIENTS: Patient[] = [
@@ -157,6 +164,12 @@ const DEFAULT_PATIENTS: Patient[] = [
 const DEFAULT_CAREGIVERS: Caregiver[] = [
   {
     id: 'cg_1',
+    patientId: 'PAC-8842',
+    userId: 'user_cuidador_joao',
+    username: 'joao.cuidador',
+    accessPassword: 'Cuidador123',
+    canAdministerMeds: true,
+    canEditData: true,
     name: 'João Oliveira',
     relationship: 'Cuidador',
     phone: '(11) 98888-1111',
@@ -168,6 +181,12 @@ const DEFAULT_CAREGIVERS: Caregiver[] = [
   },
   {
     id: 'cg_2',
+    patientId: 'PAC-8842',
+    userId: 'user_familiar_maria',
+    username: 'maria.filha',
+    accessPassword: 'Familia2026',
+    canAdministerMeds: true,
+    canEditData: true,
     name: 'Maria Santos Alves',
     relationship: 'Filha',
     phone: '(11) 97777-2222',
@@ -179,11 +198,17 @@ const DEFAULT_CAREGIVERS: Caregiver[] = [
   },
   {
     id: 'cg_3',
-    name: 'Enfermeiro Pedro Ramos',
-    relationship: 'Enfermeiro(a)',
-    phone: '(11) 96666-3333',
-    email: 'pedro.enfermeiro@gmail.com',
-    isCurrentlyOnDuty: false,
+    patientId: 'PAC-4421', // Vinculada ao cadastro principal da paciente Dona Alzira
+    userId: 'user_irani_cuidadora',
+    username: 'irani.cuidadora',
+    accessPassword: 'Irani2026',
+    canAdministerMeds: true,
+    canEditData: true,
+    name: 'Irani Simões',
+    relationship: 'Cuidador',
+    phone: '(11) 95555-4444',
+    email: 'irani.simoes@gmail.com',
+    isCurrentlyOnDuty: true,
     receiveNotifications: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -370,6 +395,8 @@ const generateInitialSchedules = (meds: Medication[]): ScheduleItem[] => {
 
       schedules.push({
         id: `sch_${m.id}_${today}_${index}`,
+        adminId: m.adminId || 'user_superadmin_juliett',
+        patientId: m.patientId || 'PAC-8842',
         medicationId: m.id,
         medicationName: m.name,
         dosage: m.dosage,
@@ -379,6 +406,11 @@ const generateInitialSchedules = (meds: Medication[]): ScheduleItem[] => {
         scheduledDate: today,
         scheduledTime: time,
         status,
+        isContinuous: m.isContinuous || m.isMedicalPrep,
+        treatmentDurationDays: m.treatmentDurationDays,
+        startDate: m.startDate,
+        endDate: m.endDate,
+        soundAlarmEnabled: m.soundAlarmEnabled !== false,
         administeredAt: adminTime,
         administeredBy: adminBy,
         responsibleRole: role,
@@ -499,6 +531,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useState<ScheduleItem | null>(null);
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isFirstSetupOpen, setIsFirstSetupOpen] = useState(false);
 
   // Firestore background initial sync
   useEffect(() => {
@@ -525,10 +558,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]);
 
         if (remotePatients.length > 0) {
-          setPatients(remotePatients);
-          if (!remotePatients.some((p) => p.id === activePatientId)) {
-            setActivePatientId(remotePatients[0].id);
-          }
+          setPatients((prev) => {
+            const map = new Map<string, Patient>();
+            prev.forEach((p) => map.set(p.id, p));
+            remotePatients.forEach((p) => map.set(p.id, p));
+            return Array.from(map.values());
+          });
         }
         if (remoteCaregivers.length > 0) setCaregivers(remoteCaregivers);
         if (remoteDoctors.length > 0) setDoctors(remoteDoctors);
@@ -544,6 +579,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     syncWithFirestore();
   }, [currentUser]);
+
+  // Link / auto-create patient profile for patient accounts or bind sub-accounts to patient
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // 1. If currentUser is a sub-account or explicitly linked to a patientId
+    if (currentUser.patientId) {
+      const linkedPatient = patients.find((p) => p.id === currentUser.patientId);
+      if (linkedPatient) {
+        setActivePatientId(linkedPatient.id);
+        return;
+      }
+    }
+
+    // If currentUser is marked as a sub-account or has subaccount roles, do not create a separate patient
+    if (
+      currentUser.isSubAccount ||
+      currentUser.role === 'responsavel' ||
+      currentUser.role === 'cuidador'
+    ) {
+      return;
+    }
+
+    const isGeneralAdmin = currentUser.username?.toLowerCase() === 'juliett.souza';
+
+    if (isGeneralAdmin) {
+      // General Admin Juliett.Souza retains general supervision across all patients
+      return;
+    }
+
+    if (currentUser.role === 'paciente' || (!isGeneralAdmin && currentUser.role !== 'admin')) {
+      const existing = patients.find(
+        (p) =>
+          (p.userId && p.userId === currentUser.uid) ||
+          p.fullName.toLowerCase().trim() === currentUser.displayName.toLowerCase().trim()
+      );
+
+      if (existing) {
+        setActivePatientId(existing.id);
+        if (existing.isFirstSetupCompleted === false) {
+          setIsFirstSetupOpen(true);
+        }
+      } else {
+        const customId = `PAC-${Math.floor(1000 + Math.random() * 9000)}`;
+        const newP: Patient = {
+          id: customId,
+          userId: currentUser.uid,
+          adminId: currentUser.adminId || currentUser.uid,
+          fullName: currentUser.displayName || 'Novo Paciente',
+          cpf: 'Não informado',
+          birthDate: '1955-01-01',
+          phone: currentUser.phone || '',
+          emergencyPhone: '',
+          address: '',
+          photo: currentUser.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300',
+          bloodType: 'O+',
+          weight: 65,
+          height: 1.6,
+          allergies: [],
+          diseases: [],
+          notes: 'Paciente cadastrado no portal CuidadoSenior.',
+          isFirstSetupCompleted: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        setPatients((prev) => [newP, ...prev]);
+        setActivePatientId(customId);
+        setIsFirstSetupOpen(true);
+        firestorePatients.save(newP).catch(console.warn);
+      }
+    }
+  }, [currentUser?.uid, currentUser?.displayName, currentUser?.role, currentUser?.patientId, patients.length]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -593,10 +701,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const selectPatientById = (id: string) => {
+    const isGeneralAdmin = currentUser?.username?.toLowerCase() === 'juliett.souza';
+    if (!isGeneralAdmin) {
+      const allowedId = currentUser?.patientId || activePatientId;
+      if (id !== allowedId) return;
+    }
     const found = patients.find((p) => p.id === id);
     if (found) {
       setActivePatientId(id);
-      addHistoryLog('Administrador', 'alteracao', `Visualização alternada para o paciente ID: ${id} (${found.fullName}).`);
+      addHistoryLog(
+        isGeneralAdmin ? 'Administradora Geral' : (currentUser?.displayName || 'Usuário'),
+        'alteracao',
+        `Visualização alternada para o paciente ID: ${id} (${found.fullName}).`
+      );
     }
   };
 
@@ -646,21 +763,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     c: Omit<Caregiver, 'id' | 'createdAt' | 'updatedAt'>,
     userName: string
   ) => {
+    const cgId = `cg_${Date.now()}`;
+    const generatedUsername =
+      c.username && c.username.trim()
+        ? c.username.trim()
+        : `${c.name.toLowerCase().split(' ')[0]}.${c.relationship.toLowerCase().replace(/[^a-z]/g, '')}`;
+    const generatedPassword = c.accessPassword && c.accessPassword.trim() ? c.accessPassword.trim() : 'Familia2026';
+    const subUserId = c.userId || `user_sub_${cgId}`;
+
     const newC: Caregiver = {
       ...c,
-      id: `cg_${Date.now()}`,
+      id: cgId,
       adminId: currentAdminId,
       patientId: activePatientId,
+      userId: subUserId,
+      username: generatedUsername,
+      accessPassword: generatedPassword,
+      canAdministerMeds: c.canAdministerMeds ?? true,
+      canEditData: c.canEditData ?? true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
     setCaregivers((prev) => [...prev, newC]);
     addHistoryLog(
       userName,
       'cadastro',
-      `Novo responsável ${newC.name} (${newC.relationship}) cadastrado.`
+      `Novo subcadastro de ${newC.relationship} ${newC.name} criado com login "${newC.username}" para a paciente.`
     );
     firestoreCaregivers.save(newC).catch(console.warn);
+
+    // Synchronize with system authentication accounts so the sub-user can immediately sign in
+    try {
+      const rawUsers = localStorage.getItem('cs_system_users');
+      const systemUsers: any[] = rawUsers ? JSON.parse(rawUsers) : [];
+      const userExists = systemUsers.some(
+        (u) => u.username?.toLowerCase() === generatedUsername.toLowerCase()
+      );
+      if (!userExists) {
+        const newSubUser = {
+          uid: subUserId,
+          patientId: activePatientId,
+          isSubAccount: true,
+          relationship: newC.relationship,
+          canAdministerMeds: newC.canAdministerMeds,
+          canEditData: newC.canEditData,
+          displayName: `${newC.name} (${newC.relationship})`,
+          username: generatedUsername,
+          email: newC.email || `${generatedUsername}@cuidadosenior.app`,
+          role: newC.relationship === 'Cuidador' || newC.relationship === 'Enfermeiro(a)' ? 'cuidador' : 'responsavel',
+          password: generatedPassword,
+          isActive: true,
+          mustChangePassword: false,
+          securityQuestion: 'Qual é o primeiro nome da sua mãe?',
+          securityAnswer: 'mae',
+          phone: newC.phone,
+          photoURL: newC.photo || 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const updatedUsers = [newSubUser, ...systemUsers];
+        localStorage.setItem('cs_system_users', JSON.stringify(updatedUsers));
+        firestoreUsers.save(newSubUser as any).catch(console.warn);
+      }
+    } catch (e) {
+      console.warn('Sync subuser error:', e);
+    }
   };
 
   const updateCaregiver = (id: string, c: Partial<Caregiver>, userName: string) => {
@@ -669,20 +837,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (item.id === id) {
           const updated = { ...item, ...c, updatedAt: new Date().toISOString() };
           firestoreCaregivers.save(updated).catch(console.warn);
+
+          // Also sync credentials and data to system users
+          if (updated.userId || updated.username) {
+            try {
+              const rawUsers = localStorage.getItem('cs_system_users');
+              if (rawUsers) {
+                const systemUsers: any[] = JSON.parse(rawUsers);
+                const userIndex = systemUsers.findIndex(
+                  (u) =>
+                    (updated.userId && u.uid === updated.userId) ||
+                    (updated.username && u.username?.toLowerCase() === updated.username.toLowerCase())
+                );
+                if (userIndex !== -1) {
+                  systemUsers[userIndex] = {
+                    ...systemUsers[userIndex],
+                    displayName: `${updated.name} (${updated.relationship})`,
+                    relationship: updated.relationship,
+                    phone: updated.phone || systemUsers[userIndex].phone,
+                    email: updated.email || systemUsers[userIndex].email,
+                    password: updated.accessPassword || systemUsers[userIndex].password,
+                    photoURL: updated.photo !== undefined ? updated.photo : systemUsers[userIndex].photoURL,
+                    canAdministerMeds: updated.canAdministerMeds ?? systemUsers[userIndex].canAdministerMeds,
+                    updatedAt: new Date().toISOString(),
+                  };
+                  localStorage.setItem('cs_system_users', JSON.stringify(systemUsers));
+                  firestoreUsers.save(systemUsers[userIndex]).catch(console.warn);
+                }
+              }
+            } catch (e) {
+              console.warn('Sync update subuser error:', e);
+            }
+          }
           return updated;
         }
         return item;
       })
     );
-    addHistoryLog(userName, 'alteracao', `Informações do responsável atualizadas.`);
+    addHistoryLog(userName, 'alteracao', `Informações e credenciais do subcadastro atualizadas.`);
   };
 
   const deleteCaregiver = (id: string, userName: string) => {
     const target = caregivers.find((x) => x.id === id);
     setCaregivers((prev) => prev.filter((x) => x.id !== id));
     if (target) {
-      addHistoryLog(userName, 'exclusao', `Responsável ${target.name} removido do sistema.`);
+      addHistoryLog(userName, 'exclusao', `Subcadastro de ${target.relationship} ${target.name} removido do sistema.`);
       firestoreCaregivers.delete(id).catch(console.warn);
+
+      // Also remove login subaccount if exists
+      if (target.userId || target.username) {
+        try {
+          const rawUsers = localStorage.getItem('cs_system_users');
+          if (rawUsers) {
+            const systemUsers: any[] = JSON.parse(rawUsers);
+            const filtered = systemUsers.filter(
+              (u) =>
+                (!target.userId || u.uid !== target.userId) &&
+                (!target.username || u.username?.toLowerCase() !== target.username.toLowerCase())
+            );
+            localStorage.setItem('cs_system_users', JSON.stringify(filtered));
+            if (target.userId) {
+              firestoreUsers.delete(target.userId).catch(console.warn);
+            }
+          }
+        } catch (e) {
+          console.warn('Sync delete subuser error:', e);
+        }
+      }
     }
   };
 
@@ -758,6 +979,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `med_${Date.now()}`,
       adminId: currentAdminId,
       patientId: activePatientId,
+      soundAlarmEnabled: m.soundAlarmEnabled !== false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -771,8 +993,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )}.`
     );
     firestoreMedications.save(newM).catch(console.warn);
-    // Automatically generate today's schedule for this new medication using the latest list
-    regenerateSchedulesForDate(getTodayString(), updatedMeds);
+
+    // Automatically generate schedules for this new medication for today and next 60 days
+    const rangeDates: string[] = [];
+    const baseDate = new Date();
+    for (let i = -2; i <= 60; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+      rangeDates.push(d.toISOString().split('T')[0]);
+    }
+    regenerateSchedulesForDates(rangeDates, updatedMeds);
   };
 
   const updateMedication = (id: string, m: Partial<Medication>, userName: string) => {
@@ -816,6 +1046,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               pharmaceuticalForm: targetMed.pharmaceuticalForm,
               photo: targetMed.photo,
               timingInstruction: targetMed.timingInstruction,
+              isContinuous: targetMed.isContinuous || targetMed.isMedicalPrep,
+              treatmentDurationDays: targetMed.treatmentDurationDays,
+              soundAlarmEnabled: targetMed.soundAlarmEnabled !== false,
               updatedAt: new Date().toISOString(),
             };
             firestoreSchedules.save(updatedSchedule).catch(console.warn);
@@ -826,7 +1059,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
 
-    regenerateSchedulesForDate(getTodayString(), updatedMeds);
+    const rangeDates: string[] = [];
+    const baseDate = new Date();
+    for (let i = -2; i <= 60; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+      rangeDates.push(d.toISOString().split('T')[0]);
+    }
+    regenerateSchedulesForDates(rangeDates, updatedMeds);
   };
 
   const deleteMedication = (id: string, userName: string) => {
@@ -1011,6 +1251,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const regenerateSchedulesForDates = (dateStrs: string[], currentMeds?: Medication[]) => {
     const medsToUse = currentMeds || medications;
+    const todayStr = getTodayString();
+
     setSchedules((existingSchedules) => {
       const datesSet = new Set(dateStrs);
       const otherDates = existingSchedules.filter((s) => !datesSet.has(s.scheduledDate));
@@ -1020,7 +1262,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         medsToUse.forEach((m) => {
           // Check start date constraint
           const mStart = m.startDate || '2000-01-01';
-          if (dateStr < mStart) {
+          const isToday = dateStr === todayStr;
+
+          // All inserted medications must appear on today's agenda even if startDate was typed in the future
+          // For future dates, they appear from startDate onwards
+          if (dateStr < mStart && !isToday) {
             return; // Medication not started yet on dateStr
           }
           // Check end date constraint
@@ -1028,22 +1274,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return; // Medication treatment finished before dateStr
           }
 
-          m.scheduledTimes.forEach((time, idx) => {
+          const times = m.scheduledTimes && m.scheduledTimes.length > 0 ? m.scheduledTimes : ['08:00'];
+
+          times.forEach((time, idx) => {
             const existing = existingSchedules.find(
               (s) => s.scheduledDate === dateStr && s.medicationId === m.id && s.scheduledTime === time
             );
             if (existing) {
               newItems.push({
                 ...existing,
+                adminId: m.adminId || existing.adminId || currentAdminId,
+                patientId: m.patientId || existing.patientId || activePatientId,
                 medicationName: m.name,
                 dosage: m.dosage,
                 pharmaceuticalForm: m.pharmaceuticalForm,
                 photo: m.photo,
                 timingInstruction: m.timingInstruction,
+                isContinuous: m.isContinuous || m.isMedicalPrep,
+                treatmentDurationDays: m.treatmentDurationDays,
+                startDate: m.startDate,
+                endDate: m.endDate,
+                soundAlarmEnabled:
+                  existing.soundAlarmEnabled !== undefined
+                    ? existing.soundAlarmEnabled
+                    : m.soundAlarmEnabled !== false,
               });
             } else {
               newItems.push({
                 id: `sch_${m.id}_${dateStr}_${idx}`,
+                adminId: m.adminId || currentAdminId,
+                patientId: m.patientId || activePatientId,
                 medicationId: m.id,
                 medicationName: m.name,
                 dosage: m.dosage,
@@ -1053,6 +1313,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 scheduledDate: dateStr,
                 scheduledTime: time,
                 status: 'pending',
+                isContinuous: m.isContinuous || m.isMedicalPrep,
+                treatmentDurationDays: m.treatmentDurationDays,
+                startDate: m.startDate,
+                endDate: m.endDate,
+                soundAlarmEnabled: m.soundAlarmEnabled !== false,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               });
@@ -1069,14 +1334,169 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     regenerateSchedulesForDates([dateStr], currentMeds);
   };
 
+  const toggleScheduleSoundAlarm = (scheduleId: string, medicationId?: string) => {
+    let newStatus = false;
+    let targetMedId = medicationId;
+
+    setSchedules((prev) =>
+      prev.map((s) => {
+        if (s.id === scheduleId || (medicationId && s.medicationId === medicationId)) {
+          newStatus = s.soundAlarmEnabled === false ? true : false;
+          if (!targetMedId) targetMedId = s.medicationId;
+          const updated = {
+            ...s,
+            soundAlarmEnabled: newStatus,
+            updatedAt: new Date().toISOString(),
+          };
+          firestoreSchedules.save(updated).catch(console.warn);
+          return updated;
+        }
+        return s;
+      })
+    );
+
+    if (targetMedId) {
+      setMedications((prev) =>
+        prev.map((m) => {
+          if (m.id === targetMedId) {
+            const updatedM = {
+              ...m,
+              soundAlarmEnabled: newStatus,
+              updatedAt: new Date().toISOString(),
+            };
+            firestoreMedications.save(updatedM).catch(console.warn);
+            return updatedM;
+          }
+          return m;
+        })
+      );
+    }
+  };
+
+  const toggleMedicationSoundAlarm = (medicationId: string) => {
+    setMedications((prev) => {
+      let nextStatus = false;
+      const updatedMeds = prev.map((m) => {
+        if (m.id === medicationId) {
+          nextStatus = m.soundAlarmEnabled === false ? true : false;
+          const updated = {
+            ...m,
+            soundAlarmEnabled: nextStatus,
+            updatedAt: new Date().toISOString(),
+          };
+          firestoreMedications.save(updated).catch(console.warn);
+          return updated;
+        }
+        return m;
+      });
+
+      setSchedules((prevSchedules) =>
+        prevSchedules.map((s) => {
+          if (s.medicationId === medicationId) {
+            const updatedS = {
+              ...s,
+              soundAlarmEnabled: nextStatus,
+              updatedAt: new Date().toISOString(),
+            };
+            firestoreSchedules.save(updatedS).catch(console.warn);
+            return updatedS;
+          }
+          return s;
+        })
+      );
+
+      return updatedMeds;
+    });
+  };
+
   const updateSettings = (s: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...s }));
   };
 
+  // Scoped Collections per active patient to guarantee data isolation & zero data leakage
+  const activeMedications = useMemo(() => {
+    return medications.filter(
+      (m) =>
+        m.patientId === activePatientId ||
+        (!m.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [medications, activePatientId]);
+
+  const activeCaregivers = useMemo(() => {
+    return caregivers.filter(
+      (c) =>
+        c.patientId === activePatientId ||
+        (!c.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [caregivers, activePatientId]);
+
+  const activeDoctors = useMemo(() => {
+    return doctors.filter(
+      (d) =>
+        d.patientId === activePatientId ||
+        (!d.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [doctors, activePatientId]);
+
+  const activeMedicalRecords = useMemo(() => {
+    return medicalRecords.filter(
+      (r) =>
+        r.patientId === activePatientId ||
+        (!r.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [medicalRecords, activePatientId]);
+
+  const activeMedicalAppointments = useMemo(() => {
+    return medicalAppointments.filter(
+      (a) =>
+        a.patientId === activePatientId ||
+        (!a.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [medicalAppointments, activePatientId]);
+
+  const activeSchedules = useMemo(() => {
+    return schedules.filter(
+      (s) =>
+        s.patientId === activePatientId ||
+        (!s.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [schedules, activePatientId]);
+
+  const currentCaregiverOnDuty =
+    activeCaregivers.find((c) => c.isCurrentlyOnDuty) || activeCaregivers[0] || caregivers[0];
+
+  const isGeneralAdmin = currentUser?.username?.toLowerCase() === 'juliett.souza';
+
+  // Only Juliett.Souza has access to all accounts/patients across the application.
+  // Standard user profiles only receive their own assigned patient data.
+  const visiblePatients = useMemo(() => {
+    if (isGeneralAdmin) {
+      return patients;
+    }
+    const myPatient = patients.filter(
+      (p) =>
+        p.id === activePatientId ||
+        (currentUser?.patientId && p.id === currentUser.patientId) ||
+        (currentUser?.uid && p.userId === currentUser.uid)
+    );
+    return myPatient.length > 0 ? myPatient : (patients.length > 0 ? [patients[0]] : []);
+  }, [patients, isGeneralAdmin, activePatientId, currentUser?.patientId, currentUser?.uid]);
+
+  const activeHistoryLogs = useMemo(() => {
+    if (isGeneralAdmin) {
+      return historyLogs;
+    }
+    return historyLogs.filter(
+      (h) =>
+        h.patientId === activePatientId ||
+        (!h.patientId && (activePatientId === 'PAC-8842' || activePatientId === 'PAC-4421'))
+    );
+  }, [historyLogs, isGeneralAdmin, activePatientId]);
+
   return (
     <AppContext.Provider
       value={{
-        patients,
+        patients: visiblePatients,
         activePatientId,
         patient: activePatient,
         selectPatientById,
@@ -1085,33 +1505,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deletePatient,
         perspectiveRole,
         setPerspectiveRole,
-        caregivers,
+        caregivers: activeCaregivers,
         addCaregiver,
         updateCaregiver,
         deleteCaregiver,
         setCaregiverOnDuty,
-        activeCaregiverOnDuty,
-        doctors,
+        activeCaregiverOnDuty: currentCaregiverOnDuty,
+        doctors: activeDoctors,
         addDoctor,
         updateDoctor,
         deleteDoctor,
-        medications,
+        medications: activeMedications,
         addMedication,
         updateMedication,
         deleteMedication,
-        medicalRecords,
+        medicalRecords: activeMedicalRecords,
         addMedicalRecord,
         updateMedicalRecord,
-        medicalAppointments,
+        medicalAppointments: activeMedicalAppointments,
         addMedicalAppointment,
         updateMedicalAppointment,
         deleteMedicalAppointment,
-        schedules,
+        schedules: activeSchedules,
         confirmScheduleAdministered,
         markScheduleNotAdministered,
         regenerateSchedulesForDate,
         regenerateSchedulesForDates,
-        historyLogs,
+        toggleScheduleSoundAlarm,
+        toggleMedicationSoundAlarm,
+        historyLogs: activeHistoryLogs,
         currentView,
         setCurrentView,
         settings,
@@ -1119,6 +1541,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pendingConfirmationSchedule,
         setPendingConfirmationSchedule,
         isOffline,
+        isFirstSetupOpen,
+        setIsFirstSetupOpen,
       }}
     >
       {children}

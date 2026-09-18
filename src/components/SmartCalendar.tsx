@@ -44,6 +44,8 @@ export const SmartCalendar: React.FC = () => {
     confirmScheduleAdministered,
     markScheduleNotAdministered,
     regenerateSchedulesForDates,
+    toggleScheduleSoundAlarm,
+    toggleMedicationSoundAlarm,
   } = useApp();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -273,9 +275,11 @@ export const SmartCalendar: React.FC = () => {
     const consultas = dayApps.filter((a) => a.type === 'consulta');
     const exames = dayApps.filter((a) => a.type === 'exame');
 
-    // Check if there are medical preparations for this day
+    // Check if there are continuous medications for this day
     const prepMeds = medications.filter(
-      (m) => m.isMedicalPrep && m.startDate <= dateStr && (!m.endDate || m.endDate >= dateStr)
+      (m) =>
+        (m.isContinuous || m.isMedicalPrep) &&
+        (m.startDate <= dateStr || (!m.startDate && dateStr === new Date().toISOString().split('T')[0]))
     );
 
     const hasMeds = dayMeds.length > 0;
@@ -324,7 +328,7 @@ export const SmartCalendar: React.FC = () => {
             <CalendarIcon className="w-7 h-7 text-[#2F7E6A]" /> Calendário Inteligente de Saúde
           </h2>
           <p className="text-xs text-[#2F7E6A] font-semibold mt-1">
-            Organização por cores: Medicamentos, Consultas, Exames e Preparos Médicos. Clique em qualquer dia para ver os detalhes ou agendar.
+            Organização por cores: Medicamentos, Consultas, Exames e Medicamentos de uso contínuo. Clique em qualquer dia para ver os detalhes ou agendar.
           </p>
         </div>
 
@@ -340,26 +344,26 @@ export const SmartCalendar: React.FC = () => {
             🔬 <strong>Roxo:</strong> Exames
           </span>
           <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-xl">
-            🏥 <strong>Âmbar:</strong> Preparo Médico
+            🔄 <strong>Âmbar:</strong> Medicamento de uso contínuo
           </span>
         </div>
       </div>
 
-      {/* Future Medical Preparations & Programmed Medications Section */}
-      {medications.some((m) => m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0])) && (
+      {/* Future Continuous & Programmed Medications Section */}
+      {medications.some((m) => m.isContinuous || m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0])) && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-5 rounded-3xl border-2 border-amber-300 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black text-amber-950 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600" /> 🏥 Preparos Médicos & Agendamentos Futuros Programados
+              <AlertCircle className="w-5 h-5 text-amber-600" /> 🔄 Medicamentos de Uso Contínuo & Agendamentos Programados
             </h3>
             <span className="text-xs font-bold text-amber-800 bg-amber-200/60 px-2.5 py-1 rounded-full">
-              {medications.filter((m) => m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0])).length} Programado(s)
+              {medications.filter((m) => m.isContinuous || m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0])).length} Programado(s)
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {medications
-              .filter((m) => m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0]))
+              .filter((m) => m.isContinuous || m.isMedicalPrep || (m.startDate && m.startDate > new Date().toISOString().split('T')[0]))
               .map((prep) => {
                 const prepStartStr = prep.startDate;
                 const formattedStart = new Date(prepStartStr + 'T00:00:00').toLocaleDateString('pt-BR');
@@ -369,9 +373,9 @@ export const SmartCalendar: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-extrabold text-sm text-[#1F2E2C]">{prep.name}</span>
-                        {prep.isMedicalPrep && (
-                          <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-300">
-                            Preparo
+                        {(prep.isContinuous || prep.isMedicalPrep) && (
+                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded-md border border-emerald-300">
+                            Uso Contínuo
                           </span>
                         )}
                       </div>
@@ -385,8 +389,25 @@ export const SmartCalendar: React.FC = () => {
                           ⏰ Doses: {prep.scheduledTimes.join(', ')}
                         </p>
                         <p className="font-semibold text-gray-600">
-                          ⏳ Duração: {prep.isContinuous ? 'Uso Contínuo' : `${prep.treatmentDurationDays || 30} dias`}
+                          ⏳ Duração: {prep.isContinuous ? 'Medicamento de uso contínuo' : `${prep.treatmentDurationDays || 30} dias de tratamento`}
                         </p>
+                        <div className="pt-1 flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-gray-600">Alarme Sonoro:</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleMedicationSoundAlarm(prep.id);
+                            }}
+                            className={`px-2 py-0.5 rounded-md border text-[10px] font-black transition ${
+                              prep.soundAlarmEnabled !== false
+                                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                : 'bg-gray-100 text-gray-600 border-gray-300'
+                            }`}
+                          >
+                            {prep.soundAlarmEnabled !== false ? '🔔 Ativo' : '🔕 Mudo'}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -495,11 +516,11 @@ export const SmartCalendar: React.FC = () => {
                       </div>
                     )}
 
-                    {/* 3. Preparos Médicos (Amber) */}
+                    {/* 3. Medicamento de uso contínuo (Amber) */}
                     {details.hasPreps && (
                       <div className="text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 rounded-md px-1 py-0.5 truncate flex items-center gap-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0"></span>
-                        🏥 Preparo
+                        🔄 Uso Contínuo
                       </div>
                     )}
 
@@ -606,6 +627,32 @@ export const SmartCalendar: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-xs font-bold text-[#2F7E6A]">Dosagem: {item.dosage}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    {item.isContinuous ? (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-[10px] rounded-md">
+                        🔄 Uso contínuo
+                      </span>
+                    ) : item.treatmentDurationDays ? (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[10px] rounded-md">
+                        ⏳ Duração: {item.treatmentDurationDays} dias
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleScheduleSoundAlarm(item.id, item.medicationId);
+                      }}
+                      className={`px-2 py-0.5 rounded-md border text-[10px] font-black transition cursor-pointer flex items-center gap-1 ${
+                        item.soundAlarmEnabled !== false
+                          ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                          : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                      }`}
+                      title="Clique para alternar o alarme sonoro deste horário"
+                    >
+                      {item.soundAlarmEnabled !== false ? '🔔 Alarme Ativo' : '🔕 Mudo'}
+                    </button>
+                  </div>
                   <p className="text-[11px] font-semibold text-gray-700">
                     Status: {item.status === 'administered' ? '✅ Administrado' : item.status === 'missed' ? '❌ Esquecido' : '⏰ Pendente'}
                   </p>
@@ -953,6 +1000,34 @@ export const SmartCalendar: React.FC = () => {
                               </span>
                             </div>
                             <p className="text-xs font-bold text-[#2F7E6A]">Dosagem: {item.dosage}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {item.isContinuous ? (
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-extrabold rounded-md flex items-center gap-1">
+                                  🔄 Medicamento de uso contínuo
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-900 border border-blue-300 text-xs font-bold rounded-md flex items-center gap-1">
+                                  ⏳ Duração do Tratamento: {item.treatmentDurationDays || 30} dias
+                                </span>
+                              )}
+                              {/* Editable Sound Alarm Toggle in Agenda */}
+                              <button
+                                type="button"
+                                onClick={() => toggleScheduleSoundAlarm(item.id, item.medicationId)}
+                                className={`px-2.5 py-1 rounded-lg border text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-xs ${
+                                  item.soundAlarmEnabled !== false
+                                    ? 'bg-amber-100 text-amber-950 border-amber-400 hover:bg-amber-200'
+                                    : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                                }`}
+                                title="Opção de alarme sonoro editável: clique para ativar ou silenciar este horário"
+                              >
+                                {item.soundAlarmEnabled !== false ? (
+                                  <>🔔 Alarme Sonoro Ativo</>
+                                ) : (
+                                  <>🔕 Alarme Sonoro Mudo</>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
 

@@ -31,10 +31,16 @@ export const MedicationAlarmBanner: React.FC = () => {
 
       if (dueMedication && dueMedication.id !== activeAlarmItem?.id) {
         setActiveAlarmItem(dueMedication);
-        if (!isMuted) {
+        const shouldPlaySound = dueMedication.soundAlarmEnabled !== false;
+        if (!isMuted && shouldPlaySound) {
           audioService.playAlarmSound();
+          const durationPhrase = dueMedication.isContinuous
+            ? 'Medicamento de uso contínuo.'
+            : dueMedication.treatmentDurationDays
+            ? `Duração do tratamento: ${dueMedication.treatmentDurationDays} dias.`
+            : '';
           audioService.speakText(
-            `Atenção! Hora do medicamento ${dueMedication.medicationName}, dosagem ${dueMedication.dosage}. ${dueMedication.timingInstruction}`
+            `Atenção! Hora do medicamento ${dueMedication.medicationName}, dosagem ${dueMedication.dosage}. ${dueMedication.timingInstruction}. ${durationPhrase}`
           );
         }
         return;
@@ -246,10 +252,21 @@ export const MedicationAlarmBanner: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-amber-600/60 p-3 rounded-2xl text-xs space-y-1 font-semibold border border-amber-400">
-        <p className="font-bold text-white text-sm">
-          Dosagem: {activeAlarmItem?.dosage} ({activeAlarmItem?.scheduledTime})
-        </p>
+      <div className="bg-amber-600/60 p-3 rounded-2xl text-xs space-y-1.5 font-semibold border border-amber-400">
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-white text-sm">
+            Dosagem: {activeAlarmItem?.dosage} ({activeAlarmItem?.scheduledTime})
+          </p>
+          {activeAlarmItem?.isContinuous ? (
+            <span className="px-2 py-0.5 bg-emerald-700/80 text-white text-[10px] font-black rounded-md border border-emerald-400">
+              🔄 Uso contínuo
+            </span>
+          ) : activeAlarmItem?.treatmentDurationDays ? (
+            <span className="px-2 py-0.5 bg-blue-700/80 text-white text-[10px] font-black rounded-md border border-blue-400">
+              ⏳ {activeAlarmItem.treatmentDurationDays} dias
+            </span>
+          ) : null}
+        </div>
         <p className="text-amber-100">📌 Instrução: {activeAlarmItem?.timingInstruction}</p>
         {patient && <p className="text-amber-200">Paciente: {patient.fullName}</p>}
       </div>

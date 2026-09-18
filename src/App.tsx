@@ -15,10 +15,11 @@ import { SaaSLogin } from './components/SaaSLogin';
 import { AuthModal } from './components/AuthModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MedicationAlarmBanner } from './components/MedicationAlarmBanner';
+import { FirstPatientSetupWizard } from './components/FirstPatientSetupWizard';
 import { Download, AlertCircle } from 'lucide-react';
 
 export function App() {
-  const { currentView, settings, isOffline } = useApp();
+  const { currentView, settings, isOffline, isFirstSetupOpen, setIsFirstSetupOpen } = useApp();
   const { currentUser, role, isSuperAdmin, isAdmin } = useAuth();
 
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -95,6 +96,9 @@ export function App() {
       </main>
 
       {/* Modals */}
+      {isFirstSetupOpen && (
+        <FirstPatientSetupWizard onClose={() => setIsFirstSetupOpen(false)} />
+      )}
       {isAuthOpen && <AuthModal onClose={() => setIsAuthOpen(false)} />}
       {isSettingsOpen && (
         <SettingsModal

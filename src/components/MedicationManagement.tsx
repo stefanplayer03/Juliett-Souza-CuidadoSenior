@@ -23,7 +23,15 @@ import { audioService } from '../services/audio';
 import { openWhatsAppMedicationReminder } from '../utils/whatsapp';
 
 export const MedicationManagement: React.FC = () => {
-  const { medications, addMedication, updateMedication, deleteMedication, patient, caregivers } = useApp();
+  const {
+    medications,
+    addMedication,
+    updateMedication,
+    deleteMedication,
+    patient,
+    caregivers,
+    toggleMedicationSoundAlarm,
+  } = useApp();
   const { role, currentUser } = useAuth();
   const isAdmin = role === 'admin';
 
@@ -45,6 +53,7 @@ export const MedicationManagement: React.FC = () => {
   const [durationOption, setDurationOption] = useState<string>('continuous');
   const [isContinuous, setIsContinuous] = useState(true);
   const [isMedicalPrep, setIsMedicalPrep] = useState(false);
+  const [soundAlarmEnabled, setSoundAlarmEnabled] = useState(true);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [treatmentDurationDays, setTreatmentDurationDays] = useState(30);
@@ -128,6 +137,7 @@ export const MedicationManagement: React.FC = () => {
     setDurationOption('continuous');
     setIsContinuous(true);
     setIsMedicalPrep(false);
+    setSoundAlarmEnabled(true);
     setStartDate(new Date().toISOString().split('T')[0]);
     setEndDate('');
     setTreatmentDurationDays(30);
@@ -171,6 +181,7 @@ export const MedicationManagement: React.FC = () => {
 
     setIsContinuous(m.isContinuous);
     setIsMedicalPrep(m.isMedicalPrep || false);
+    setSoundAlarmEnabled(m.soundAlarmEnabled !== false);
     setStartDate(m.startDate);
     setEndDate(m.endDate || '');
     setTreatmentDurationDays(m.treatmentDurationDays || 30);
@@ -206,6 +217,7 @@ export const MedicationManagement: React.FC = () => {
       treatmentDurationDays: isContinuous ? undefined : treatmentDurationDays,
       isContinuous,
       isMedicalPrep,
+      soundAlarmEnabled,
       timingInstruction,
       notes,
     };
@@ -332,11 +344,35 @@ export const MedicationManagement: React.FC = () => {
                       <span className="px-2.5 py-0.5 bg-[#E9F7F2] text-[#2F7E6A] border border-[#63C6A7] text-xs font-bold rounded-full">
                         {m.pharmaceuticalForm}
                       </span>
-                      {m.isMedicalPrep && (
-                        <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black rounded-full flex items-center gap-1">
-                          🏥 Preparo Médico
+                      {m.isContinuous || m.isMedicalPrep ? (
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-extrabold rounded-full flex items-center gap-1">
+                          🔄 Medicamento de uso contínuo
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold rounded-full flex items-center gap-1">
+                          ⏳ Duração: {m.treatmentDurationDays || 30} dias
                         </span>
                       )}
+                      {/* Sound alarm editable option button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleMedicationSoundAlarm(m.id);
+                        }}
+                        className={`px-2.5 py-0.5 text-xs font-black rounded-full border transition flex items-center gap-1 cursor-pointer ${
+                          m.soundAlarmEnabled !== false
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                        }`}
+                        title="Clique para ativar/desativar o alarme sonoro deste medicamento"
+                      >
+                        {m.soundAlarmEnabled !== false ? (
+                          <>🔔 Alarme Sonoro Ativo</>
+                        ) : (
+                          <>🔕 Alarme Sonoro Mudo</>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -456,15 +492,29 @@ export const MedicationManagement: React.FC = () => {
                 </div>
 
                 <div className="flex items-center sm:pt-6">
-                  <label className="flex items-center gap-2 cursor-pointer p-3 bg-white border-2 border-[#63C6A7] rounded-xl w-full">
+                  <label className="flex items-center gap-2 cursor-pointer p-3 bg-white border-2 border-[#63C6A7] rounded-xl w-full hover:bg-[#E9F7F2]/40 transition">
                     <input
                       type="checkbox"
-                      checked={isMedicalPrep}
-                      onChange={(e) => setIsMedicalPrep(e.target.checked)}
-                      className="w-4 h-4 accent-[#2F7E6A] rounded"
+                      checked={isContinuous || isMedicalPrep}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsMedicalPrep(checked);
+                        setIsContinuous(checked);
+                        if (checked) {
+                          setDurationOption('continuous');
+                          setEndDate('');
+                        } else {
+                          setDurationOption('30');
+                          setTreatmentDurationDays(30);
+                          const sDate = startDate ? new Date(startDate) : new Date();
+                          sDate.setDate(sDate.getDate() + 30);
+                          setEndDate(sDate.toISOString().split('T')[0]);
+                        }
+                      }}
+                      className="w-4 h-4 accent-[#2F7E6A] rounded cursor-pointer"
                     />
                     <span className="text-xs font-extrabold text-[#1F2E2C]">
-                      🏥 Marcar como Preparo Médico / Procedimento
+                      🔄 Medicamento de uso contínuo
                     </span>
                   </label>
                 </div>
@@ -705,6 +755,34 @@ export const MedicationManagement: React.FC = () => {
                   className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs text-[#1F2E2C]"
                   rows={2}
                 />
+              </div>
+
+              {/* Sound Alarm Configuration Option */}
+              <div className="p-3 bg-[#E9F7F2]/70 rounded-2xl border-2 border-[#63C6A7] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl ${soundAlarmEnabled ? 'bg-[#2F7E6A] text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    <Volume2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-[#1F2E2C] block">
+                      Opção de Alarme Sonoro (Editável)
+                    </span>
+                    <span className="text-[11px] text-gray-600 font-semibold">
+                      Tocar despertador sonoro e pronunciar instruções em voz alta na agenda
+                    </span>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded-xl border border-[#63C6A7] shadow-xs hover:bg-[#E9F7F2]/40 transition">
+                  <input
+                    type="checkbox"
+                    checked={soundAlarmEnabled}
+                    onChange={(e) => setSoundAlarmEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-[#2F7E6A] rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-black text-[#1F2E2C]">
+                    {soundAlarmEnabled ? '🔔 Alarme Ativado' : '🔕 Alarme Silenciado'}
+                  </span>
+                </label>
               </div>
 
               {/* Actions */}

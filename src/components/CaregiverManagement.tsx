@@ -13,10 +13,16 @@ import {
   Edit2,
   ShieldCheck,
   CheckCircle2,
+  KeyRound,
+  Copy,
+  Lock,
+  Camera,
 } from 'lucide-react';
+import { ProfilePhotoModal } from './ProfilePhotoModal';
 
 export const CaregiverManagement: React.FC = () => {
   const {
+    patient,
     caregivers,
     addCaregiver,
     updateCaregiver,
@@ -42,11 +48,21 @@ export const CaregiverManagement: React.FC = () => {
   const [shiftHours, setShiftHours] = useState('');
   const [notes, setNotes] = useState('');
   const [receiveNotifications, setReceiveNotifications] = useState(true);
+  const [username, setUsername] = useState('');
+  const [accessPassword, setAccessPassword] = useState('Familia2026');
+  const [canAdministerMeds, setCanAdministerMeds] = useState(true);
+  const [canEditData, setCanEditData] = useState(false);
+
+  const [photo, setPhoto] = useState('');
+  const [editingPhotoCaregiver, setEditingPhotoCaregiver] = useState<Caregiver | null>(null);
+  const [isCaregiverPhotoModalOpen, setIsCaregiverPhotoModalOpen] = useState(false);
+  const [isFormPhotoPickerOpen, setIsFormPhotoPickerOpen] = useState(false);
 
   const userName = currentUser?.displayName || 'Administrador';
 
   const resetForm = () => {
     setName('');
+    setPhoto('');
     setRelationship('Cuidador');
     setPhone('');
     setEmail('');
@@ -54,6 +70,10 @@ export const CaregiverManagement: React.FC = () => {
     setShiftHours('');
     setNotes('');
     setReceiveNotifications(true);
+    setUsername('');
+    setAccessPassword('Familia2026');
+    setCanAdministerMeds(true);
+    setCanEditData(false);
     setEditingId(null);
   };
 
@@ -65,6 +85,7 @@ export const CaregiverManagement: React.FC = () => {
   const handleOpenEdit = (c: Caregiver) => {
     setEditingId(c.id);
     setName(c.name);
+    setPhoto(c.photo || '');
     setRelationship(c.relationship);
     setPhone(c.phone);
     setEmail(c.email);
@@ -72,6 +93,10 @@ export const CaregiverManagement: React.FC = () => {
     setShiftHours(c.shiftHours || '');
     setNotes(c.notes || '');
     setReceiveNotifications(c.receiveNotifications);
+    setUsername(c.username || '');
+    setAccessPassword(c.accessPassword || 'Familia2026');
+    setCanAdministerMeds(c.canAdministerMeds ?? true);
+    setCanEditData(c.canEditData ?? false);
     setIsModalOpen(true);
   };
 
@@ -86,17 +111,35 @@ export const CaregiverManagement: React.FC = () => {
       return;
     }
 
+    const assignedUsername = username.trim() || name.trim().toLowerCase().replace(/[^a-z0-9]/g, '.') || `resp.${Math.floor(1000 + Math.random() * 9000)}`;
+    const assignedPassword = accessPassword.trim() || 'Familia2026';
+
     if (editingId) {
       updateCaregiver(
         editingId,
-        { name, relationship, phone, email, cpf, shiftHours, notes, receiveNotifications },
+        {
+          name,
+          photo: photo || undefined,
+          relationship,
+          phone,
+          email,
+          cpf,
+          shiftHours,
+          notes,
+          receiveNotifications,
+          username: assignedUsername,
+          accessPassword: assignedPassword,
+          canAdministerMeds,
+          canEditData,
+        },
         userName
       );
-      setSuccessMsg(`Perfil de ${name} (${relationship}) atualizado com sucesso!`);
+      setSuccessMsg(`Perfil de ${name} (${relationship}) atualizado com sucesso! Subcadastro: @${assignedUsername}`);
     } else {
       addCaregiver(
         {
           name,
+          photo: photo || undefined,
           relationship,
           phone,
           email,
@@ -105,10 +148,14 @@ export const CaregiverManagement: React.FC = () => {
           notes,
           isCurrentlyOnDuty: caregivers.length === 0,
           receiveNotifications,
+          username: assignedUsername,
+          accessPassword: assignedPassword,
+          canAdministerMeds,
+          canEditData,
         },
         userName
       );
-      setSuccessMsg(`Novo membro ${name} registrado com sucesso como ${relationship}!`);
+      setSuccessMsg(`Novo membro ${name} registrado com sucesso como ${relationship}! Subcadastro criado com login @${assignedUsername}`);
     }
 
     setIsModalOpen(false);
@@ -330,6 +377,71 @@ export const CaregiverManagement: React.FC = () => {
               </div>
             </div>
 
+            {/* Sub-account Login Credentials Box (Inline) */}
+            <div className="p-3.5 bg-[#E9F7F2] rounded-2xl border-2 border-[#63C6A7] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#2F7E6A]">
+                  <KeyRound className="w-4 h-4 text-[#2F7E6A]" />
+                  <span>Subcadastro de Acesso do Responsável</span>
+                </div>
+                <span className="text-[11px] font-bold text-[#1F2E2C]">
+                  Vinculado a: <strong>{patient.fullName}</strong>
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-600 font-medium">
+                Este membro terá credenciais exclusivas para acessar o perfil e medicações do paciente <strong>{patient.fullName}</strong>.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-black text-[#1F2E2C] uppercase mb-1">
+                    Usuário / Login de Acesso
+                  </label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Ex: maria.santos"
+                    className="w-full p-2.5 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-bold text-[#1F2E2C]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-[#1F2E2C] uppercase mb-1">
+                    Senha de Acesso
+                  </label>
+                  <input
+                    type="text"
+                    value={accessPassword}
+                    onChange={(e) => setAccessPassword(e.target.value)}
+                    placeholder="Ex: Familia2026"
+                    className="w-full p-2.5 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-mono font-bold text-[#1F2E2C]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#1F2E2C]">
+                  <input
+                    type="checkbox"
+                    checked={canAdministerMeds}
+                    onChange={(e) => setCanAdministerMeds(e.target.checked)}
+                    className="w-4 h-4 text-[#2F7E6A] rounded"
+                  />
+                  Pode Confirmar Remédios Ministrados
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#1F2E2C]">
+                  <input
+                    type="checkbox"
+                    checked={canEditData}
+                    onChange={(e) => setCanEditData(e.target.checked)}
+                    className="w-4 h-4 text-[#2F7E6A] rounded"
+                  />
+                  Pode Editar Agenda e Informações Médicas
+                </label>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 pt-2">
               <input
                 type="checkbox"
@@ -379,21 +491,52 @@ export const CaregiverManagement: React.FC = () => {
           >
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-lg font-black text-[#1F2E2C]">{c.name}</h4>
-                    {c.isCurrentlyOnDuty && (
-                      <span className="px-2 py-0.5 bg-[#2F7E6A] text-white font-extrabold text-[10px] rounded-md flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Em Plantão
-                      </span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPhotoCaregiver(c);
+                      setIsCaregiverPhotoModalOpen(true);
+                    }}
+                    className="relative group cursor-pointer shrink-0"
+                    title="Clique para editar ou trocar a foto de perfil deste membro"
+                  >
+                    <img
+                      src={c.photo || 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120'}
+                      alt={c.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-[#63C6A7] shadow-xs group-hover:opacity-80 transition"
+                    />
+                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+                      <Camera className="w-3.5 h-3.5" />
+                    </div>
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-base sm:text-lg font-black text-[#1F2E2C] leading-tight">{c.name}</h4>
+                      {c.isCurrentlyOnDuty && (
+                        <span className="px-2 py-0.5 bg-[#2F7E6A] text-white font-extrabold text-[10px] rounded-md flex items-center gap-1 shrink-0">
+                          <CheckCircle2 className="w-3 h-3" /> Em Plantão
+                        </span>
+                      )}
+                    </div>
+                    <span className="inline-block mt-1 px-2.5 py-0.5 bg-[#BFE8D6] text-[#1F2E2C] text-xs font-bold rounded-full">
+                      {c.relationship}
+                    </span>
                   </div>
-                  <span className="inline-block mt-1 px-2.5 py-0.5 bg-[#BFE8D6] text-[#1F2E2C] text-xs font-bold rounded-full">
-                    {c.relationship}
-                  </span>
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPhotoCaregiver(c);
+                      setIsCaregiverPhotoModalOpen(true);
+                    }}
+                    className="p-2 text-gray-500 hover:text-[#2F7E6A] hover:bg-[#E9F7F2] rounded-xl transition cursor-pointer"
+                    title="Trocar Foto de Perfil"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => handleOpenEdit(c)}
                     className="p-2 text-gray-500 hover:text-[#2F7E6A] hover:bg-[#E9F7F2] rounded-xl transition"
@@ -433,6 +576,49 @@ export const CaregiverManagement: React.FC = () => {
                     📝 {c.notes}
                   </p>
                 )}
+                {/* Subcadastro Credentials Box */}
+                <div className="bg-[#E9F7F2] p-2.5 rounded-2xl border border-[#BFE8D6] space-y-1.5 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-[#2F7E6A] flex items-center gap-1">
+                      <KeyRound className="w-3.5 h-3.5 text-[#2F7E6A]" /> Subcadastro de Acesso
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-500">
+                      Vinculado a {patient.fullName}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-xs bg-white p-2 rounded-xl border border-[#BFE8D6]">
+                    <div>
+                      <span className="text-[10px] text-gray-500 font-bold block">Usuário:</span>
+                      <strong className="text-[#1F2E2C] font-mono">@{c.username || c.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-500 font-bold block">Senha:</span>
+                      <strong className="text-[#1F2E2C] font-mono">{c.accessPassword || 'Familia2026'}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const userLogin = c.username || c.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+                        const pass = c.accessPassword || 'Familia2026';
+                        navigator.clipboard.writeText(`Acesso ao CuidadoSenior\nPaciente: ${patient.fullName}\nUsuário: ${userLogin}\nSenha: ${pass}`);
+                        setSuccessMsg(`Credenciais de acesso de ${c.name} copiadas com sucesso!`);
+                        setTimeout(() => setSuccessMsg(null), 3500);
+                      }}
+                      className="px-2.5 py-1 bg-[#2F7E6A] hover:bg-[#256555] text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition shadow-xs"
+                      title="Copiar dados de login para enviar ao responsável"
+                    >
+                      <Copy className="w-3 h-3" /> Copiar Acesso
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] font-semibold text-gray-600 px-0.5">
+                    <span>Ministra Remédios: <strong className="text-[#1F2E2C]">{c.canAdministerMeds !== false ? 'SIM' : 'NÃO'}</strong></span>
+                    <span>•</span>
+                    <span>Edita Ficha: <strong className="text-[#1F2E2C]">{c.canEditData ? 'SIM' : 'NÃO'}</strong></span>
+                  </div>
+                </div>
+
                 <p className="flex items-center gap-2 font-semibold text-gray-600">
                   <Bell className="w-4 h-4 text-[#2F7E6A]" /> Alertas SMS/Push:{' '}
                   <strong>{c.receiveNotifications ? 'Ativados' : 'Desativados'}</strong>
@@ -462,6 +648,28 @@ export const CaregiverManagement: React.FC = () => {
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Photo Selector in Form */}
+              <div className="bg-white p-3.5 rounded-2xl border-2 border-[#63C6A7] flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={photo || 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120'}
+                    alt="Foto do perfil"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#2F7E6A] shadow-xs"
+                  />
+                  <div>
+                    <label className="block text-xs font-black text-[#1F2E2C]">Foto de Perfil do Membro</label>
+                    <p className="text-[11px] text-gray-500 font-semibold">Tire foto, envie arquivo do celular ou escolha avatar</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFormPhotoPickerOpen(true)}
+                  className="px-3.5 py-2 bg-[#2F7E6A] hover:bg-[#256555] text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
+                >
+                  <Camera className="w-4 h-4 text-[#63C6A7]" /> Escolher Foto
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#1F2E2C] mb-1">Nome Completo *</label>
                 <input
@@ -551,6 +759,71 @@ export const CaregiverManagement: React.FC = () => {
                   placeholder="Informações adicionais, credenciais ou recomendações de plantão..."
                   className="w-full p-3 bg-white border-2 border-[#63C6A7] rounded-xl text-xs font-medium"
                 />
+              </div>
+
+              {/* Sub-account Login Credentials Box (Modal) */}
+              <div className="p-3.5 bg-white rounded-2xl border-2 border-[#63C6A7] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-[#2F7E6A]">
+                    <KeyRound className="w-4 h-4 text-[#2F7E6A]" />
+                    <span>Subcadastro de Acesso do Responsável</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#1F2E2C]">
+                    Vinculado a: <strong>{patient.fullName}</strong>
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-600 font-medium">
+                  Este membro terá credenciais exclusivas para acessar o perfil e medicações do paciente <strong>{patient.fullName}</strong>.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-black text-[#1F2E2C] uppercase mb-1">
+                      Usuário / Login de Acesso
+                    </label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Ex: maria.santos"
+                      className="w-full p-2.5 bg-[#E9F7F2]/40 border-2 border-[#63C6A7] rounded-xl text-xs font-bold text-[#1F2E2C]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-[#1F2E2C] uppercase mb-1">
+                      Senha de Acesso
+                    </label>
+                    <input
+                      type="text"
+                      value={accessPassword}
+                      onChange={(e) => setAccessPassword(e.target.value)}
+                      placeholder="Ex: Familia2026"
+                      className="w-full p-2.5 bg-[#E9F7F2]/40 border-2 border-[#63C6A7] rounded-xl text-xs font-mono font-bold text-[#1F2E2C]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 pt-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#1F2E2C]">
+                    <input
+                      type="checkbox"
+                      checked={canAdministerMeds}
+                      onChange={(e) => setCanAdministerMeds(e.target.checked)}
+                      className="w-4 h-4 text-[#2F7E6A] rounded"
+                    />
+                    Pode Confirmar Remédios Ministrados
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#1F2E2C]">
+                    <input
+                      type="checkbox"
+                      checked={canEditData}
+                      onChange={(e) => setCanEditData(e.target.checked)}
+                      className="w-4 h-4 text-[#2F7E6A] rounded"
+                    />
+                    Pode Editar Agenda e Informações Médicas
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
@@ -646,6 +919,42 @@ export const CaregiverManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Photo modal for clicking directly on caregiver card avatar */}
+      {editingPhotoCaregiver && (
+        <ProfilePhotoModal
+          isOpen={isCaregiverPhotoModalOpen}
+          onClose={() => {
+            setIsCaregiverPhotoModalOpen(false);
+            setEditingPhotoCaregiver(null);
+          }}
+          currentPhoto={editingPhotoCaregiver.photo}
+          userName={editingPhotoCaregiver.name}
+          userRole={editingPhotoCaregiver.relationship}
+          userLogin={editingPhotoCaregiver.username}
+          title={`Foto de ${editingPhotoCaregiver.name}`}
+          subtitle="Troque ou personalize a foto de perfil deste membro do cuidado."
+          onSavePhoto={(newPhotoUrl) => {
+            updateCaregiver(editingPhotoCaregiver.id, { photo: newPhotoUrl }, userName);
+            setSuccessMsg(`Foto de ${editingPhotoCaregiver.name} atualizada com sucesso!`);
+            setTimeout(() => setSuccessMsg(null), 4000);
+          }}
+        />
+      )}
+
+      {/* Photo modal for form selector */}
+      <ProfilePhotoModal
+        isOpen={isFormPhotoPickerOpen}
+        onClose={() => setIsFormPhotoPickerOpen(false)}
+        currentPhoto={photo}
+        userName={name || 'Membro do Cuidado'}
+        userRole={relationship}
+        userLogin={username}
+        title="Escolher Foto do Membro"
+        subtitle="Carregue uma foto do dispositivo, cole link ou selecione um avatar."
+        onSavePhoto={(newPhotoUrl) => {
+          setPhoto(newPhotoUrl);
+        }}
+      />
     </div>
   );
 };

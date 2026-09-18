@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { SECURITY_QUESTIONS, UserRole } from '../types';
+import { SECURITY_QUESTIONS, UserRole, Patient } from '../types';
+import { firestorePatients } from '../firebase/db';
 import {
   Pill,
   Shield,
@@ -70,7 +71,7 @@ export const SaaSLogin: React.FC<SaaSLoginProps> = ({ onSuccess }) => {
   const [regName, setRegName] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regRole, setRegRole] = useState<UserRole>('user');
+  const [regRole, setRegRole] = useState<UserRole>('paciente');
   const [regPassword, setRegPassword] = useState('');
   const [regQuestion, setRegQuestion] = useState(SECURITY_QUESTIONS[0]);
   const [regAnswer, setRegAnswer] = useState('');
@@ -231,24 +232,71 @@ export const SaaSLogin: React.FC<SaaSLoginProps> = ({ onSuccess }) => {
     }
 
     try {
+      const cleanUsername = regUsername.trim();
+      const isJuliett = cleanUsername.toLowerCase() === 'juliett.souza';
+      const assignedRole: UserRole = isJuliett ? 'superadmin' : 'user';
+
       const res = await registerUser({
         displayName: regName.trim(),
-        username: regUsername.trim(),
+        username: cleanUsername,
         email: regEmail.trim().toLowerCase(),
-        role: 'admin',
+        role: assignedRole,
         password: regPassword,
         securityQuestion: regQuestion,
         securityAnswer: regAnswer,
-        mustChangePassword: false, // Administrador Clínico cadastra sua senha definitiva
+        mustChangePassword: false,
         isActive: true,
       });
 
       if (!res.success) {
-        setErrorMessage(res.error || 'Erro ao registrar administrador clínico.');
+        setErrorMessage(res.error || 'Erro ao registrar usuário.');
         return;
       }
 
-      setSuccessMessage(`Administrador Clínico "${regUsername}" cadastrado com sucesso! Autenticando...`);
+      // If registered as regular user/patient, automatically provision their isolated patient record
+      if (!isJuliett) {
+        const customId = `PAC-${Math.floor(1000 + Math.random() * 9000)}`;
+        const userUid = res.user?.uid || `user_${Date.now()}`;
+        const newPatient: Patient = {
+          id: customId,
+          userId: userUid,
+          adminId: 'user_superadmin_juliett',
+          fullName: regName.trim(),
+          cpf: 'Não informado',
+          birthDate: '1955-01-01',
+          phone: '',
+          emergencyPhone: '',
+          address: '',
+          photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300',
+          bloodType: 'O+',
+          weight: 65,
+          height: 1.6,
+          allergies: [],
+          diseases: [],
+          notes: 'Paciente cadastrado via portal CuidadoSenior.',
+          isFirstSetupCompleted: false, // Triggers First Setup Wizard
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        try {
+          const rawPatients = localStorage.getItem('cs_patients_list');
+          const currentList: Patient[] = rawPatients ? JSON.parse(rawPatients) : [];
+          const updatedList = [newPatient, ...currentList.filter((p) => p.id !== customId)];
+          localStorage.setItem('cs_patients_list', JSON.stringify(updatedList));
+          localStorage.setItem('cs_active_patient_id', customId);
+        } catch (e) {
+          console.warn('LocalStorage save notice:', e);
+        }
+        firestorePatients.save(newPatient).catch(console.warn);
+      }
+
+      setSuccessMessage(
+        !isJuliett
+          ? `Usuário "${regName}" cadastrado com sucesso! Acessando os dados do paciente...`
+          : `Administradora Geral "${regUsername}" autenticada com sucesso!`
+      );
+
       setTimeout(async () => {
         const loginRes = await loginWithCredentials(regUsername, regPassword);
         if (loginRes.success) {
@@ -672,16 +720,19 @@ export const SaaSLogin: React.FC<SaaSLoginProps> = ({ onSuccess }) => {
               </div>
             )}
 
-            {/* MODE 4: REGISTER CLINICAL ADMIN */}
+            {/* MODE 4: REGISTER USER / PATIENT */}
             {mode === 'register' && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                {/* Clinical Admin Role Badge */}
-                <div className="bg-[#EAF6F0] border border-[#2F7E6A]/30 rounded-2xl p-3 flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-[#2F7E6A] shrink-0 mt-0.5" />
+                {/* Role Notice */}
+                <div className="bg-[#EAF6F0] border-2 border-[#2F7E6A]/30 rounded-2xl p-3.5 flex items-start gap-3">
+                  <User className="w-5 h-5 text-[#2F7E6A] shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-black text-[#1F2E2C]">Conta: Administrador Clínico (Gestor)</p>
-                    <p className="text-[11px] text-[#2F7E6A] font-medium leading-relaxed">
-                      Seu cadastro cria a conta de gestão principal. Dentro do seu painel você cadastrará seus pacientes, cuidadores, médicos e rotinas médicas, mantendo todos atrelados a você.
+                    <p className="text-xs font-black text-[#1F2E2C]">Cadastro de Conta: Perfil Usuário</p>
+                    <p className="text-[11px] text-[#2F7E6A] font-medium leading-relaxed mt-0.5">
+                      Sua conta terá perfil de usuário com acesso dedicado e seguro aos dados do seu paciente cadastrado, medicações e cuidadores.
+                    </p>
+                    <p className="text-[10px] text-gray-500 font-semibold mt-1">
+                      * O perfil de Administrador Geral é exclusivo de <strong>Juliett.Souza</strong>.
                     </p>
                   </div>
                 </div>
@@ -777,9 +828,9 @@ export const SaaSLogin: React.FC<SaaSLoginProps> = ({ onSuccess }) => {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#2F7E6A] hover:bg-[#256555] text-white font-black text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#2F7E6A] hover:bg-[#256555] text-white font-black text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <ShieldCheck className="w-4 h-4" /> Concluir Cadastro de Administrador Clínico
+                  <HeartPulse className="w-4 h-4 text-[#63C6A7]" /> Concluir Cadastro de Usuário / Paciente e Entrar
                 </button>
               </form>
             )}
@@ -796,9 +847,9 @@ export const SaaSLogin: React.FC<SaaSLoginProps> = ({ onSuccess }) => {
                     setSuccessMessage(null);
                     setMode('register');
                   }}
-                  className="hover:text-[#1F2E2C] hover:underline flex items-center gap-1"
+                  className="hover:text-[#1F2E2C] hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  ➕ Criar Conta de Administrador Clínico
+                  ➕ Criar Nova Conta (Perfil Usuário / Paciente)
                 </button>
                 <button
                   type="button"
